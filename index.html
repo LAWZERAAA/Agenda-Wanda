@@ -87,6 +87,7 @@ button:hover{background:#92274f}
 
 <label>Serviço</label>
 <select id="servico">
+  <option value="" disabled selected>Selecione</option>
   <option>Manicure</option>
   <option>Pedicure</option>
   <option>Podologia</option>
@@ -104,6 +105,21 @@ button:hover{background:#92274f}
 
 <div id="agenda"></div>
 
+</div>
+
+<!-- Área do Administrador -->
+<div id="adminLogin" class="container">
+  <h3>Área do Administrador</h3>
+  <label>Usuário</label>
+  <input id="adminUser">
+  <label>Senha</label>
+  <input type="password" id="adminPass">
+  <button onclick="loginAdmin()">Entrar</button>
+</div>
+
+<div id="adminArea" class="container" style="display:none">
+  <h3>Agenda Completa</h3>
+  <div id="agendaAdmin"></div>
 </div>
 
 <script>
@@ -154,10 +170,13 @@ function agendar(){
 
   sucesso.style.display="none";
 
-  if(!nome||!data||!hora){alert("Preencha todos os campos");return;}
+  if(!nome||!data||!hora||!servico){
+    alert("Preencha todos os campos corretamente");
+    return;
+  }
 
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  agenda.push({nome,servico,data,hora});
+  agenda.push({nome,servico,data,hora,cliente:nome});
   localStorage.setItem("agenda",JSON.stringify(agenda));
 
   mostrarAgenda();
@@ -182,8 +201,9 @@ Novo agendamento:
 
 function mostrarAgenda(){
   const div = document.getElementById("agenda");
-  div.innerHTML="<h3>Horários Agendados</h3>";
+  div.innerHTML="<h3>Meus Agendamentos</h3>";
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  const nomeCliente = document.getElementById("nome").value;
 
   agenda.forEach((a,i)=>{
     div.innerHTML+=`
@@ -191,7 +211,9 @@ function mostrarAgenda(){
         <strong>${a.nome}</strong><br>
         ${a.servico}<br>
         ${a.data} às ${a.hora}
-        <button class="cancelar" onclick="cancelar(${i})">Cancelar</button>
+        ${a.cliente===nomeCliente ? 
+          `<button class="cancelar" onclick="cancelar(${i})">Cancelar</button>` 
+          : ""}
       </div>`;
   });
 }
@@ -202,6 +224,36 @@ function cancelar(i){
   localStorage.setItem("agenda",JSON.stringify(agenda));
   mostrarAgenda();
   atualizarHorarios();
+}
+
+// Área do administrador
+function loginAdmin(){
+  const user = document.getElementById("adminUser").value;
+  const pass = document.getElementById("adminPass").value;
+
+
+  if(user==="admin" && pass==="Wanda1234"){
+    document.getElementById("adminLogin").style.display="none";
+    document.getElementById("adminArea").style.display="block";
+    mostrarAgendaAdmin();
+  } else {
+    alert("Usuário ou senha incorretos");
+  }
+}
+
+function mostrarAgendaAdmin(){
+  const div = document.getElementById("agendaAdmin");
+  div.innerHTML="";
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+
+  agenda.forEach((a)=>{
+    div.innerHTML+=`
+      <div class="item">
+        <strong>${a.nome}</strong><br>
+        ${a.servico}<br>
+        ${a.data} às ${a.hora}
+      </div>`;
+  });
 }
 
 // Inicializa ao carregar

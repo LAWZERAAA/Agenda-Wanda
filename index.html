@@ -10,8 +10,8 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <!-- CSS externo com cache busting (mantenha seu style.css atual) -->
- <script src="./script.js?v=20260205-9" defer></script>
+  <!-- CSS externo com cache busting -->
+  <link rel="stylesheet" href="./style.css?v=20260205-1" />
 </head>
 <body>
 
@@ -49,35 +49,3 @@
     <h2>Painel do Administrador</h2>
     <button class="btn-outline" onclick="mostrarLogin()">Entrar / Trocar Usuário</button>
 
-    <div id="adminLogin" style="margin-top:10px;">
-      <h3>Login</h3>
-      <input id="adminUser" placeholder="Usuário" />
-      <input id="adminPass" type="password" placeholder="Senha" />
-      <button onclick="loginAdmin()">Entrar</button>
-    </div>
-
-    <div id="adminArea">
-      <div class="card soft" style="margin-bottom:12px;">
-        <h3>Todos os Agendamentos (Ordem Cronológica)</h3>
-        <div class="legend">
-          <span class="tag tag-past">Passado</span>
-          <span class="tag tag-today">Hoje</span>
-          <span class="tag tag-future">Futuro</span>
-        </div>
-        <div class="admin-actions">
-          <button class="btn-outline" onclick="exportarCSV()">Exportar CSV</button>
-          <span id="adminCount" class="muted"></span>
-        </div>
-      </div>
-
-      <div id="adminList" class="admin-list"></div>
-
-      <button class="btn-danger" onclick="logoutAdmin()">Sair</button>
-    </div>
-  </div>
-</div>
-
-<!-- JS externo com cache busting (ATUALIZE a versão ao fazer mudanças) -->
-<script src="./script.js?v=20260205-8" defer></script>
-</body>
-</html>

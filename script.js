@@ -104,8 +104,14 @@ function atualizarHorarios(){
     msg.textContent = "Selecione data e serviço.";
     return;
   }
-  if(isSunday(data)){ msg.textContent = "Domingo indisponível. Escolha outro dia."; return; }
-  if(isPastDate(data)){ msg.textContent = "Data já passou. Escolha outra."; return; }
+  if(isPastDate(data)){
+    msg.textContent = "Data já passou. Escolha outra."; 
+    return;
+  }
+  if(isSunday(data)){
+    msg.textContent = "Domingo indisponível. Escolha outro dia."; 
+    return;
+  }
 
   msg.textContent = "Carregando horários…";
 
@@ -145,8 +151,8 @@ function agendar(){
   if(!nome || !contatoRaw || !data || !hora || !servicoID){
     alert("Preencha todos os campos."); return;
   }
-  if(isSunday(data)){ alert("Domingo indisponível."); return; }
   if(isPastDate(data)){ alert("Data já passou."); return; }
+  if(isSunday(data)){ alert("Domingo indisponível."); return; }
   if(isPastTimeOnDate(data, hora)){ alert("Horário já passou."); return; }
 
   const servico = servicos.find(s=>s.id===servicoID);
@@ -307,7 +313,8 @@ function renderCalendario(){
     const isToday = (dataStr===todayStr);
     const domingo = isSunday(dataStr);
 
-    html += `<td class="${isToday?'today':''}" onclick="selecionarDia('${dataStr}')" style="${domingo?'background:#fff5f5;':''}">`;
+    const bg = domingo ? '#fff5f5' : '';
+    html += `<td class="${isToday?'today':''}" onclick="selecionarDia('${dataStr}')" style="background:${bg};">`;
     html += `<div class="day-number">${dia}</div>`;
     if(items.length>0){
       html += `<div class="cell-chips">`;
@@ -445,6 +452,46 @@ Se quiser remarcar, é só responder esta mensagem.`;
   renderCalendario();
   renderDia(selectedDate);
   renderProximos();
+}
+
+/* =========================
+   Exportar CSV
+========================= */
+function exportarCSV(){
+  const agenda = getAgenda().sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
+
+  if(agenda.length === 0){
+    alert("Não há agendamentos para exportar.");
+    return;
+  }
+
+  // Cabeçalho
+  const headers = [
+    "id","nome","contato","servico","preco","duracao_min","data","hora"
+  ];
+
+  // Linhas
+  const linhas = agenda.map(a => ([
+    a.id,
+    `"${(a.nome||"").replace(/"/g,'""')}"`,
+    `"${(a.contato||"").replace(/"/g,'""')}"`,
+    `"${(a.servico||"").replace(/"/g,'""')}"`,
+    `"${(a.precoTexto||"").replace(/"/g,'""')}"`,
+    a.duracao || 60,
+    a.data,
+    a.hora
+  ].join(",")));
+
+  const csv = [headers.join(","), ...linhas].join("\n");
+  const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `agendamentos_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+
+  URL.revokeObjectURL(url);
 }
 
 /* =========================

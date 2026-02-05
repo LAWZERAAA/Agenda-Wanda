@@ -19,11 +19,6 @@ const servicos = [
 
 let adminLogado = false;
 
-// Estado do calendário admin
-let currentYear  = new Date().getFullYear();
-let currentMonth = new Date().getMonth(); // 0..11
-let selectedDate = toDateInputValue(new Date()); // yyyy-mm-dd
-
 /* =========================
    Utils
 ========================= */
@@ -188,7 +183,7 @@ function agendar(){
   setTimeout(()=>document.getElementById("sucesso").style.display="none", 3000);
 
   mostrarAgenda(); atualizarHorarios();
-  if(adminLogado){ renderCalendario(); renderDia(selectedDate); renderProximos(); }
+  if(adminLogado){ renderAdminList(); }
 
   const msg =
 `Olá! 💅
@@ -241,7 +236,7 @@ function cancelarCliente(id){
   setAgenda(agenda);
 
   mostrarAgenda(); atualizarHorarios();
-  if(adminLogado){ renderCalendario(); renderDia(selectedDate); renderProximos(); }
+  if(adminLogado){ renderAdminList(); }
 
   const msg =
 `⚠️ Cancelamento pelo cliente
@@ -255,7 +250,7 @@ function cancelarCliente(id){
 }
 
 /* =========================
-   Admin — login
+   Admin — login e UI
 ========================= */
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "1234";
@@ -268,15 +263,7 @@ function loginAdmin(){
     adminLogado = true;
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminArea").style.display = "block";
-
-    // Seleciona automaticamente o próximo dia com agendamento (se existir)
-    const next = proximoDiaComAgenda() || toDateInputValue(new Date());
-    selectedDate = next;
-
-    buildHoursColumn();
-    renderCalendario();
-    renderDia(selectedDate);
-    renderProximos();
+    renderAdminList(); // lista cronológica
   }else{
     alert("Credenciais incorretas.");
   }
@@ -286,137 +273,118 @@ function logoutAdmin(){
   document.getElementById("adminArea").style.display = "none";
 }
 
+function limparFiltrosAdmin(){
+  document.getElementById("adminSearch").value = "";
+  document.getElementById("adminOnlyFuture").checked = false;
+  document.getElementById("adminDateStart").value = "";
+  document.getElementById("adminDateEnd").value = "";
+  renderAdminList();
+}
+
 /* =========================
-   Admin — calendário mensal
+   Admin — render lista cronológica
 ========================= */
-function renderCalendario(){
-  const cal = document.getElementById("calendario");
-  const primeiro = new Date(currentYear, currentMonth, 1);
-  const ultimo = new Date(currentYear, currentMonth+1, 0);
-  const todayStr = toDateInputValue(new Date());
-  const mesNome = primeiro.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+function passesFilters(item){
+  const q = (document.getElementById("adminSearch").value || "").toLowerCase().trim();
+  const onlyFuture = document.getElementById("adminOnlyFuture").checked;
+  const ds = document.getElementById("adminDateStart").value;
+  const de = document.getElementById("adminDateEnd").value;
 
-  let html = `<h4 style="text-transform:capitalize; margin:6px 0 8px;">${mesNome}</h4>`;
-  html += `<table><thead><tr>`;
-  const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-  dias.forEach(d=> html += `<th>${d}</th>`);
-  html += `</tr></thead><tbody><tr>`;
+  // filtro texto
+  if(q){
+    const alvo = `${item.nome} ${item.servico} ${item.contato}`.toLowerCase();
+    if(!alvo.includes(q)) return false;
+  }
+  // filtro intervalo
+  if(ds && item.data < ds) return false;
+  if(de && item.data > de) return false;
 
-  let diaSemana = primeiro.getDay();
-  for(let i=0;i<diaSemana;i++){ html += `<td></td>`; }
-
-  const agenda = getAgenda();
-
-  for(let dia=1; dia<=ultimo.getDate(); dia++){
-    const dataStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
-    const items = agenda.filter(a=>a.data===dataStr).sort((a,b)=>a.hora.localeCompare(b.hora));
-    const isToday = (dataStr===todayStr);
-    const domingo = isSunday(dataStr);
-
-    const bg = domingo ? '#fff5f5' : '';
-    html += `<td class="${isToday?'today':''}" onclick="selecionarDia('${dataStr}')" style="background:${bg};">`;
-    html += `<div class="day-number">${dia}</div>`;
-    if(items.length>0){
-      html += `<div class="cell-chips">`;
-      items.slice(0,4).forEach(it=>{ html += `<span class="chip">${it.hora}</span>`; });
-      if(items.length>4){ html += `<span class="chip">+${items.length-4}</span>`; }
-      html += `</div>`;
-    }
-    html += `</td>`;
-
-    if((dia + diaSemana) % 7 === 0) html += `</tr><tr>`;
+  // filtro somente futuros (considera data e hora)
+  if(onlyFuture){
+    if(item.data < toDateInputValue(new Date())) return false;
+    if(item.data === toDateInputValue(new Date()) && isPastTimeOnDate(item.data, item.hora)) return false;
   }
 
-  html += `</tr></tbody></table>`;
-  cal.innerHTML = html;
+  return true;
 }
-function selecionarDia(dateStr){ selectedDate = dateStr; renderDia(selectedDate); }
-function mesAnterior(){ currentMonth--; if(currentMonth<0){ currentMonth=11; currentYear--; } renderCalendario(); }
-function mesSeguinte(){ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendario(); }
 
-/* =========================
-   Admin — visão do dia (Teams-like)
-========================= */
-function buildHoursColumn(){
-  const hoursCol = document.getElementById("hoursCol");
-  hoursCol.innerHTML = "";
-  for(let m=START_DAY_MIN; m<=END_DAY_MIN; m+=60){
-    const label = minutosParaHHMM(m);
-    hoursCol.innerHTML += `<div class="hour">${label}</div>`;
-  }
+function statusBadge(item){
+  const hoje = toDateInputValue(new Date());
+  if(item.data < hoje) return {cls:"past", txt:"Passado"};
+  if(item.data > hoje) return {cls:"future", txt:"Futuro"};
+  // mesmo dia
+  return isPastTimeOnDate(item.data, item.hora) ? {cls:"past", txt:"Passado"} : {cls:"today", txt:"Hoje"};
 }
-function renderDia(dateStr){
-  const titulo = document.getElementById("diaTitulo");
-  const slots = document.getElementById("daySlots");
-  const empty = document.getElementById("listaDiaVazia");
 
-  const d = new Date(dateStr);
-  titulo.textContent = d.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
-
-  slots.innerHTML = "";
+function renderAdminList(){
+  const wrap = document.getElementById("adminList");
+  const countEl = document.getElementById("adminCount");
   const agenda = getAgenda()
-    .filter(a=>a.data===dateStr)
-    .sort((a,b)=>a.hora.localeCompare(b.hora));
-
-  if(agenda.length===0){ empty.style.display = "block"; return; } else { empty.style.display = "none"; }
-
-  const pxPerMin = 64/60;
-  agenda.forEach(a=>{
-    const startMin = hhmmParaMinutos(a.hora);
-    const top = Math.max(0, (startMin - START_DAY_MIN) * pxPerMin);
-    const height = (a.duracao || 60) * pxPerMin;
-
-    const el = document.createElement("div");
-    el.className = "event";
-    el.style.top = `${top}px`;
-    el.style.height = `${height}px`;
-    el.innerHTML = `
-      <div class="title">${a.hora} · ${a.servico}</div>
-      <div class="meta">Cliente: <strong>${a.nome}</strong> — <span class="muted">${a.precoTexto}</span></div>
-      <div class="meta">WhatsApp: +55 ${a.contato || '-'}</div>
-      <div class="actions">
-        <button class="btn-danger" onclick="cancelarAdminById('${a.id}')">Cancelar</button>
-      </div>
-    `;
-    slots.appendChild(el);
-  });
-}
-function diaAnterior(){ const d = new Date(selectedDate); d.setDate(d.getDate()-1); selectedDate = toDateInputValue(d); renderDia(selectedDate); }
-function diaSeguinte(){ const d = new Date(selectedDate); d.setDate(d.getDate()+1); selectedDate = toDateInputValue(d); renderDia(selectedDate); }
-
-/* =========================
-   Admin — próximos agendamentos (lista)
-========================= */
-function proximoDiaComAgenda(){
-  const todayStr = toDateInputValue(new Date());
-  const agenda = getAgenda()
-    .filter(a => (a.data > todayStr) || (a.data === todayStr && !isPastTimeOnDate(a.data, a.hora)))
-    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
-  return agenda.length ? agenda[0].data : null;
-}
-
-function renderProximos(limit=20){
-  const wrap = document.getElementById("adminUpcoming");
-  const todayStr = toDateInputValue(new Date());
-  const lista = getAgenda()
-    .filter(a => (a.data > todayStr) || (a.data === todayStr && !isPastTimeOnDate(a.data, a.hora)))
     .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora))
-    .slice(0, limit);
+    .filter(passesFilters);
 
   wrap.innerHTML = "";
-  if(lista.length === 0){
-    wrap.innerHTML = `<div class="muted">Nenhum agendamento futuro.</div>`;
+  countEl.textContent = `${agenda.length} registro(s)`;
+
+  if(agenda.length === 0){
+    wrap.innerHTML = `<div class="muted">Nenhum agendamento encontrado para os filtros aplicados.</div>`;
     return;
   }
-  lista.forEach(a=>{
-    wrap.innerHTML += `
-      <div class="item">
-        <strong>${a.data} — ${a.hora}</strong><br/>
-        ${a.servico} — ${a.precoTexto}<br/>
-        Cliente: ${a.nome} | WhatsApp: +55 ${a.contato}<br/>
-        <button class="btn-danger" onclick="cancelarAdminById('${a.id}')">Cancelar</button>
-      </div>`;
+
+  // Agrupar por data
+  let atual = "";
+  let grupoEl = null;
+  agenda.forEach(item=>{
+    if(item.data !== atual){
+      atual = item.data;
+      grupoEl = document.createElement("div");
+      grupoEl.className = "date-group";
+      grupoEl.innerHTML = `
+        <div class="group-header">
+          <div class="group-title">${formatarDataBr(atual)}</div>
+          <div class="group-count"></div>
+        </div>
+      `;
+      wrap.appendChild(grupoEl);
+    }
+
+    const badge = statusBadge(item);
+    const row = document.createElement("div");
+    row.className = "admin-item";
+    row.innerHTML = `
+      <div class="slot">
+        <div class="time">
+          <span class="chip">${item.hora}</span>
+          <span class="badge ${badge.cls}">${badge.txt}</span>
+        </div>
+      </div>
+      <div class="details">
+        <div><strong>${item.servico}</strong> — <span class="muted">${item.precoTexto}</span></div>
+        <div>Cliente: <strong>${item.nome}</strong></div>
+        <div>WhatsApp: +55 ${item.contato || '-'}</div>
+      </div>
+      <div class="actions">
+        <button class="btn-danger" onclick="cancelarAdminById('${item.id}')">Cancelar</button>
+      </div>
+    `;
+    grupoEl.appendChild(row);
   });
+
+  // Atualiza contagem por grupo
+  [...wrap.querySelectorAll(".date-group")].forEach(group=>{
+    const items = group.querySelectorAll(".admin-item").length;
+    group.querySelector(".group-count").textContent = `${items} agendamento(s)`;
+  });
+}
+
+function formatarDataBr(yyyyMMdd){
+  const [y,m,d] = yyyyMMdd.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  const semana = dt.toLocaleDateString('pt-BR', { weekday:'long' });
+  const dia = String(d).padStart(2,"0");
+  const mes = dt.toLocaleDateString('pt-BR', { month:'long' });
+  const ano = y;
+  return `${semana}, ${dia} de ${mes} de ${ano}`;
 }
 
 /* =========================
@@ -448,58 +416,3 @@ Se quiser remarcar, é só responder esta mensagem.`;
     alert("Não foi possível enviar ao cliente (WhatsApp inválido).");
   }
 
-  // Atualiza tudo
-  renderCalendario();
-  renderDia(selectedDate);
-  renderProximos();
-}
-
-/* =========================
-   Exportar CSV
-========================= */
-function exportarCSV(){
-  const agenda = getAgenda().sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
-
-  if(agenda.length === 0){
-    alert("Não há agendamentos para exportar.");
-    return;
-  }
-
-  // Cabeçalho
-  const headers = [
-    "id","nome","contato","servico","preco","duracao_min","data","hora"
-  ];
-
-  // Linhas
-  const linhas = agenda.map(a => ([
-    a.id,
-    `"${(a.nome||"").replace(/"/g,'""')}"`,
-    `"${(a.contato||"").replace(/"/g,'""')}"`,
-    `"${(a.servico||"").replace(/"/g,'""')}"`,
-    `"${(a.precoTexto||"").replace(/"/g,'""')}"`,
-    a.duracao || 60,
-    a.data,
-    a.hora
-  ].join(",")));
-
-  const csv = [headers.join(","), ...linhas].join("\n");
-  const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `agendamentos_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-
-  URL.revokeObjectURL(url);
-}
-
-/* =========================
-   Inicialização
-========================= */
-window.addEventListener('DOMContentLoaded', ()=>{
-  popularServicos();
-  document.getElementById("msgHorarios").textContent = "Selecione data e serviço.";
-  getAgenda(); // migração e cache
-  mostrarAgenda();
-});

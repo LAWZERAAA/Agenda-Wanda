@@ -11,7 +11,7 @@
   <meta http-equiv="Expires" content="0" />
 
   <!-- CSS externo com cache busting -->
-  <link rel="stylesheet" href="./style.css?v=20260205-1" />
+  <link rel="stylesheet" href="./style.css?v=20260205-2" />
 </head>
 <body>
 
@@ -20,8 +20,9 @@
   <div class="card">
     <h2>Agendamentos</h2>
 
+    <!-- Campo Nome permanece apenas para cadastro, não é mais usado como filtro -->
     <label>Nome</label>
-    <input id="nome" type="text" placeholder="Seu nome" oninput="mostrarAgenda()" />
+    <input id="nome" type="text" placeholder="Seu nome" />
 
     <label>WhatsApp para Contato</label>
     <input id="contato" type="text" placeholder="(DDD) 99999-9999" />
@@ -40,7 +41,7 @@
 
     <div id="sucesso" class="success">Agendado com sucesso!</div>
 
-    <h3 style="margin-top:18px;">Meus Agendamentos</h3>
+    <h3 style="margin-top:18px;">Todos os Agendamentos (Ordem Cronológica)</h3>
     <div id="agenda"></div>
   </div>
 
@@ -49,7 +50,7 @@
     <h2>Painel do Administrador</h2>
     <button class="btn-outline" onclick="mostrarLogin()">Entrar / Trocar Usuário</button>
 
-    <!-- Bloco de login (fica escondido até clicar) -->
+    <!-- Bloco de login (escondido até clicar) -->
     <div id="adminLogin" style="margin-top:10px; display:none;">
       <h3>Login</h3>
       <input id="adminUser" placeholder="Usuário" />
@@ -67,7 +68,7 @@
           <span class="tag tag-future">Futuro</span>
         </div>
         <div class="admin-actions">
-          <button class="btn-outline" onclick="exportarCSV()">Exportar CSV</button>
+          <!-- Removido o botão Exportar CSV -->
           <span id="adminCount" class="muted"></span>
         </div>
       </div>
@@ -80,6 +81,6 @@
 </div>
 
 <!-- JS externo com cache busting -->
-<script src="./script.js?v=20260205-10" defer></script>
+<script src="./script.js?v=20260205-11" defer></script>
 </body>
 </html>

@@ -11,7 +11,7 @@
   <meta http-equiv="Expires" content="0" />
 
   <!-- CSS externo com cache busting -->
-  <link rel="stylesheet" href="./style.css?v=20260205-3" />
+  <link rel="stylesheet" href="./style.css?v=20260205-5">
 </head>
 <body>
 
@@ -57,49 +57,38 @@
     </div>
 
     <div id="adminArea">
-      <div class="admin-grid">
-        <!-- Calendário mensal -->
-        <div class="card" style="padding:12px;">
-          <div class="calendar-header">
-            <h3>Calendário (Mensal)</h3>
-            <div class="calendar-nav">
-              <button class="btn-outline" onclick="mesAnterior()">◀ Mês Anterior</button>
-              <button class="btn-outline" onclick="mesSeguinte()">Próximo Mês ▶</button>
-            </div>
-          </div>
-          <div id="calendario"></div>
+      <div class="card soft" style="margin-bottom:12px;">
+        <h3>Todos os Agendamentos (Ordem Cronológica)</h3>
+        <div class="admin-filters">
+          <input id="adminSearch" placeholder="Buscar por nome, serviço ou WhatsApp" oninput="renderAdminList()" />
+          <label class="inline">
+            <input id="adminOnlyFuture" type="checkbox" onchange="renderAdminList()" />
+            Mostrar apenas futuros
+          </label>
         </div>
-
-        <!-- Visão do dia -->
-        <div class="card" style="padding:12px;">
-          <div class="day-view">
-            <div class="day-toolbar">
-              <strong id="diaTitulo">Dia</strong>
-              <div>
-                <button class="btn-outline" onclick="diaAnterior()">◀ Dia</button>
-                <button class="btn-outline" onclick="diaSeguinte()">Dia ▶</button>
-              </div>
-            </div>
-            <div class="timeline">
-              <div class="hours" id="hoursCol"></div>
-              <div class="slots" id="daySlots"></div>
-            </div>
-            <div id="listaDiaVazia" class="no-events" style="display:none;">Sem agendamentos neste dia.</div>
+        <div class="admin-filters">
+          <div>
+            <label class="small">De</label>
+            <input id="adminDateStart" type="date" onchange="renderAdminList()" />
           </div>
+          <div>
+            <label class="small">Até</label>
+            <input id="adminDateEnd" type="date" onchange="renderAdminList()" />
+          </div>
+          <button class="btn-outline" onclick="limparFiltrosAdmin()">Limpar Filtros</button>
+        </div>
+        <div class="legend">
+          <span class="tag tag-past">Passado</span>
+          <span class="tag tag-today">Hoje</span>
+          <span class="tag tag-future">Futuro</span>
+        </div>
+        <div class="admin-actions">
+          <button class="btn-outline" onclick="exportarCSV()">Exportar CSV</button>
+          <span id="adminCount" class="muted"></span>
         </div>
       </div>
 
-      <!-- Próximos -->
-      <div class="card" style="margin-top:12px;">
-        <h3>Próximos Agendamentos</h3>
-        <div id="adminUpcoming"></div>
-      </div>
-
-      <!-- Ações -->
-      <div class="card" style="margin-top:12px;">
-        <h3>Ações do Administrador</h3>
-        <button class="btn-outline" onclick="exportarCSV()">Exportar CSV</button>
-      </div>
+      <div id="adminList" class="admin-list"></div>
 
       <button class="btn-danger" onclick="logoutAdmin()">Sair</button>
     </div>
@@ -107,6 +96,6 @@
 </div>
 
 <!-- JS externo com cache busting -->
-<script src="./script.js?v=20260205-3"></script>
+<script src="./script.js?v=20260205-4"></script>
 </body>
 </html>

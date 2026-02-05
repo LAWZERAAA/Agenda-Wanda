@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
 <meta charset="UTF-8">
 <title>Sistema de Agendamentos</title>
@@ -8,123 +9,154 @@
 <style>
 body{
   font-family: Arial, sans-serif;
-  background: #f8f8f8;
+  background: #f4f4f4;
   padding: 20px;
-  color: #333;
 }
-h2,h3{
-  text-align:center;
-}
+
 .container{
-  max-width:500px;
-  margin:auto;
-  background:#fff;
-  padding:20px;
-  border-radius:10px;
-  box-shadow:0 0 10px rgba(0,0,0,0.1);
+  max-width: 600px;
+  margin: auto;
+  background: white;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #0002;
+}
+
+h2, h3{
+  text-align: center;
 }
 
 label{
   font-weight: bold;
+  margin-top: 10px;
+  display: block;
 }
+
 input, select{
-  width:100%;
-  padding:10px;
-  margin:8px 0;
-  border:1px solid #ccc;
-  border-radius:5px;
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
 }
 
 button{
-  width:100%;
-  padding:12px;
-  background:#4CAF50;
-  border:none;
-  color:#fff;
-  font-size:16px;
-  border-radius:5px;
-  cursor:pointer;
-}
-button:hover{
-  background:#45a049;
+  width: 100%;
+  padding: 12px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  margin-top: 15px;
+  cursor: pointer;
+  font-size: 16px;
 }
 
-.item{
-  background:#eee;
-  padding:10px;
-  margin:10px 0;
-  border-radius:5px;
+button:hover{
+  background: #218838;
 }
 
 .cancelar{
-  background:#d9534f;
-  margin-top:10px;
+  background: #dc3545;
 }
 .cancelar:hover{
-  background:#c9302c;
+  background: #b52a37;
+}
+
+.item{
+  background: #f0f0f0;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 5px;
 }
 
 #sucesso{
-  display:none;
-  padding:10px;
-  background:#4CAF50;
-  color:#fff;
-  margin-top:15px;
-  border-radius:5px;
+  display: none;
+  margin-top: 10px;
+  padding: 10px;
+  background: #28a745;
+  color: white;
+  border-radius: 4px;
 }
 
 #adminArea, #adminLogin{
-  margin-top:20px;
-  display:none;
+  display: none;
+  margin-top: 20px;
+}
+
+#calendario table{
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+#calendario th{
+  padding: 5px;
+  background: #ddd;
+}
+
+#calendario td{
+  padding: 8px;
+  border: 1px solid #ccc;
 }
 </style>
 </head>
+
 <body>
 
 <div class="container">
-  <h2>Agendamento</h2>
 
-  <label>Nome</label>
-  <input id="nome" type="text" placeholder="Seu nome" oninput="mostrarAgenda()">
+<h2>Agendamentos</h2>
 
-  <label>Serviço</label>
-  <select id="servico"></select>
+<label>Nome</label>
+<input id="nome" type="text" placeholder="Seu nome" oninput="mostrarAgenda()">
 
-  <label>Data</label>
-  <input id="data" type="date" onchange="atualizarHorarios()">
+<label>WhatsApp para Contato</label>
+<input id="contato" type="text" placeholder="(DDD) 99999-9999">
 
-  <label>Horário</label>
-  <select id="hora"></select>
+<label>Serviço</label>
+<select id="servico"></select>
 
-  <button onclick="agendar()">Agendar</button>
+<label>Data</label>
+<input id="data" type="date" onchange="atualizarHorarios()">
 
-  <div id="sucesso">Agendado com sucesso!</div>
+<label>Horário</label>
+<select id="hora"></select>
 
-  <h3>Meus Agendamentos</h3>
-  <div id="agenda"></div>
+<div id="msgHorarios" style="color:#777;margin-top:5px;"></div>
 
-  <hr>
+<button onclick="agendar()">Agendar</button>
 
-  <button onclick="mostrarLogin()">Área do Administrador</button>
+<div id="sucesso">Agendado com sucesso!</div>
 
-  <div id="adminLogin">
-    <h3>Login do Administrador</h3>
-    <input id="adminUser" placeholder="Usuário">
-    <input id="adminPass" type="password" placeholder="Senha">
-    <button onclick="loginAdmin()">Entrar</button>
-  </div>
+<h3>Meus Agendamentos</h3>
+<div id="agenda"></div>
 
-  <div id="adminArea">
-    <h3>Painel Administrativo</h3>
-    <div id="agendaAdmin"></div>
-    <button onclick="logoutAdmin()">Sair</button>
-  </div>
+<hr>
+
+<button onclick="mostrarLogin()">Área do Administrador</button>
+
+<div id="adminLogin">
+  <h3>Login</h3>
+  <input id="adminUser" placeholder="Usuário">
+  <input id="adminPass" type="password" placeholder="Senha">
+  <button onclick="loginAdmin()">Entrar</button>
 </div>
 
+<div id="adminArea">
+  <h3>Painel Administrativo</h3>
 
-<!-- =========================================
-     JAVASCRIPT COMPLETO E FUNCIONANDO
-========================================= -->
+  <h3>Calendário</h3>
+  <div id="calendario"></div>
+
+  <h3>Lista do Dia</h3>
+  <div id="agendaAdmin"></div>
+
+  <button onclick="logoutAdmin()">Sair</button>
+</div>
+
+</div>
+
 <script>
 // =========================
 // CONFIGURAÇÃO
@@ -154,9 +186,7 @@ function hhmmParaMinutos(hhmm){
 }
 
 function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){
-  const aFim = aInicio + aDur;
-  const bFim = bInicio + bDur;
-  return (aInicio < bFim) && (bInicio < aFim);
+  return (aInicio < bInicio + bDur) && (bInicio < aInicio + aDur);
 }
 
 
@@ -167,12 +197,14 @@ function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){
 function popularServicos(){
   const sel = document.getElementById("servico");
   sel.innerHTML = `<option value="" disabled selected>Selecione o serviço</option>`;
+  
   servicos.forEach(s => {
     const op = document.createElement("option");
     op.value = s.id;
     op.textContent = `${s.nome} — ${s.precoTexto} (1h)`;
     sel.appendChild(op);
   });
+
   sel.onchange = atualizarHorarios;
 }
 
@@ -185,26 +217,26 @@ function atualizarHorarios(){
   const data = document.getElementById("data").value;
   const servicoID = document.getElementById("servico").value;
   const horaSel = document.getElementById("hora");
+  const msg = document.getElementById("msgHorarios");
+
   horaSel.innerHTML = "";
 
   if(!data || !servicoID){
-    const op = document.createElement("option");
-    op.textContent = "Selecione data e serviço";
-    op.disabled = true;
-    op.selected = true;
-    horaSel.appendChild(op);
+    msg.textContent = "Selecione data e serviço.";
     return;
   }
+
+  msg.textContent = "Carregando horários...";
 
   const servico = servicos.find(s => s.id === servicoID);
   const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
   const ocupados = agenda
-      .filter(a => a.data === data)
-      .map(a => ({
-          inicio: hhmmParaMinutos(a.hora),
-          dur: a.duracao
-      }));
+    .filter(a => a.data === data)
+    .map(a => ({
+      inicio: hhmmParaMinutos(a.hora),
+      dur: a.duracao
+    }));
 
   horariosBase.forEach(hr => {
     const inicio = hhmmParaMinutos(hr);
@@ -220,13 +252,9 @@ function atualizarHorarios(){
     }
   });
 
-  if(horaSel.options.length === 0){
-    const op = document.createElement("option");
-    op.textContent = "Nenhum horário disponível";
-    op.disabled = true;
-    op.selected = true;
-    horaSel.appendChild(op);
-  }
+  msg.textContent = horaSel.options.length > 0
+    ? "Horários disponíveis:"
+    : "Nenhum horário disponível nesta data.";
 }
 
 
@@ -236,11 +264,12 @@ function atualizarHorarios(){
 
 function agendar(){
   const nome = document.getElementById("nome").value.trim();
+  const contato = document.getElementById("contato").value.trim();
   const data = document.getElementById("data").value;
   const hora = document.getElementById("hora").value;
   const servicoID = document.getElementById("servico").value;
 
-  if(!nome || !data || !hora || !servicoID){
+  if(!nome || !contato || !data || !hora || !servicoID){
     alert("Preencha todos os campos.");
     return;
   }
@@ -248,19 +277,9 @@ function agendar(){
   const servico = servicos.find(s => s.id === servicoID);
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
-  const inicio = hhmmParaMinutos(hora);
-  const conflito = agenda
-      .filter(a => a.data === data)
-      .some(a => intervalosSobrepoem(inicio, servico.duracao, hhmmParaMinutos(a.hora), a.duracao));
-
-  if(conflito){
-    alert("Este horário já está ocupado.");
-    atualizarHorarios();
-    return;
-  }
-
   agenda.push({
     nome,
+    contato,
     data,
     hora,
     servico: servico.nome,
@@ -270,19 +289,20 @@ function agendar(){
 
   localStorage.setItem("agenda", JSON.stringify(agenda));
 
+  document.getElementById("sucesso").style.display = "block";
+  setTimeout(()=>document.getElementById("sucesso").style.display = "none",3000);
+
   mostrarAgenda();
   atualizarHorarios();
 
   if(adminLogado) mostrarAgendaAdmin();
-
-  document.getElementById("sucesso").style.display = "block";
-  setTimeout(() => document.getElementById("sucesso").style.display = "none", 3000);
 
   const msg =
 `Olá! 💅
 Novo agendamento:
 
 👤 ${nome}
+💬 Contato: ${contato}
 💆 ${servico.nome}
 💵 ${servico.precoTexto}
 ⏱️ 1h
@@ -303,9 +323,9 @@ function mostrarAgenda(){
 
   const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
-  div.innerHTML = "";
-
   const meus = agenda.filter(a => a.nome.toLowerCase() === nomeBusca);
+
+  div.innerHTML = "";
 
   if(meus.length === 0){
     div.innerHTML = "<p>Nenhum agendamento encontrado.</p>";
@@ -314,27 +334,28 @@ function mostrarAgenda(){
 
   meus.forEach((a,i) => {
     div.innerHTML += `
-    <div class="item">
-      <strong>${a.nome}</strong><br>
-      ${a.servico} — ${a.precoTexto}<br>
-      ${a.data} às ${a.hora}<br>
-      <button class="cancelar" onclick="cancelar(${i})">Cancelar</button>
-    </div>`;
+      <div class="item">
+        <strong>${a.nome}</strong><br>
+        ${a.servico} — ${a.precoTexto}<br>
+        WhatsApp: ${a.contato}<br>
+        ${a.data} às ${a.hora}<br>
+        <button class="cancelar" onclick="cancelar(${i})">Cancelar</button>
+      </div>`;
   });
 }
 
 
 // =========================
-// CANCELAR
+// CANCELAR CLIENTE
 // =========================
 
 function cancelar(i){
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
   agenda.splice(i,1);
   localStorage.setItem("agenda", JSON.stringify(agenda));
+
   mostrarAgenda();
   atualizarHorarios();
-  if(adminLogado) mostrarAgendaAdmin();
 }
 
 
@@ -357,31 +378,113 @@ function loginAdmin(){
     adminLogado = true;
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminArea").style.display = "block";
-    mostrarAgendaAdmin();
+    gerarCalendario();
   } else {
-    alert("Usuário ou senha incorretos.");
+    alert("Credenciais incorretas.");
   }
-}
-
-function mostrarAgendaAdmin(){
-  const div = document.getElementById("agendaAdmin");
-  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-
-  div.innerHTML = "";
-
-  agenda.forEach(a => {
-    div.innerHTML += `
-    <div class="item">
-      <strong>${a.nome}</strong><br>
-      ${a.servico} — ${a.precoTexto}<br>
-      ${a.data} às ${a.hora}
-    </div>`;
-  });
 }
 
 function logoutAdmin(){
   adminLogado = false;
   document.getElementById("adminArea").style.display = "none";
+}
+
+
+// =========================
+// CALENDÁRIO TIPO OUTLOOK
+// =========================
+
+function gerarCalendario(){
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = hoje.getMonth();
+
+  const primeiroDia = new Date(ano, mes, 1);
+  const ultimoDia = new Date(ano, mes+1, 0);
+
+  let html = `<h4>${primeiroDia.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}</h4>`;
+  html += "<table><tr>";
+
+  const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  dias.forEach(d=>html += `<th>${d}</th>`);
+  html += "</tr><tr>";
+
+  let diaSemana = primeiroDia.getDay();
+  for(let i=0;i<diaSemana;i++) html += "<td></td>";
+
+  for(let dia=1; dia<=ultimoDia.getDate(); dia++){
+    const dataStr = `${ano}-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+
+    const ag = JSON.parse(localStorage.getItem("agenda")) || [];
+    const marcado = ag.some(a=>a.data===dataStr);
+
+    html += `
+      <td onclick="mostrarAgendaDoDia('${dataStr}')"
+          style="cursor:pointer; background:${marcado?'#cce5ff':''}">
+          ${dia}
+      </td>
+    `;
+
+    if((dia + diaSemana) % 7 === 0) html += "</tr><tr>";
+  }
+
+  html += "</tr></table>";
+
+  document.getElementById("calendario").innerHTML = html;
+}
+
+
+// =========================
+// ADMIN VISUALIZA DIA
+// =========================
+
+function mostrarAgendaDoDia(data){
+  const div = document.getElementById("agendaAdmin");
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  const lista = agenda.filter(a => a.data === data);
+
+  let html = `<h3>Agendamentos em ${data}</h3>`;
+
+  if(lista.length === 0){
+    html += "<p>Nenhum agendamento.</p>";
+  } else {
+    lista.forEach((a,i)=>{
+      html += `
+        <div class="item">
+        <strong>${a.nome}</strong> — WhatsApp: ${a.contato}<br>
+        ${a.servico} — ${a.precoTexto}<br>
+        ${a.hora}<br>
+        <button class="cancelar" onclick="cancelarAdmin('${a.nome}','${a.contato}',${i})">Cancelar</button>
+        </div>`;
+    });
+  }
+
+  div.innerHTML = html;
+}
+
+
+// =========================
+// ADMIN CANCELA + WHATSAPP
+// =========================
+
+function cancelarAdmin(nome, contato, index){
+  if(!confirm("Deseja cancelar este horário?")) return;
+
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  const item = agenda[index];
+
+  agenda.splice(index,1);
+  localStorage.setItem("agenda", JSON.stringify(agenda));
+
+  const msg =
+`Olá ${nome}! ❌
+Seu agendamento foi cancelado pelo administrador.
+Se desejar remarcar, estamos à disposição.`;
+
+  window.open(`https://wa.me/55${contato.replace(/\D/g,"")}?text=${encodeURIComponent(msg)}`);
+
+  mostrarAgendaAdmin();
+  gerarCalendario();
 }
 
 
@@ -393,6 +496,7 @@ window.onload = () => {
   popularServicos();
   atualizarHorarios();
 };
+
 </script>
 
 </body>

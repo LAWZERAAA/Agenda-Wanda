@@ -1,0 +1,458 @@
+/* =========================
+   CONFIG
+========================= */
+// Telefone do ADMIN no WhatsApp (somente dígitos, com DDI)
+const telefoneWhatsApp = "5519992880591";
+
+// Funcionamento: Seg(1) a Sáb(6), 08:00–17:00 | slots de 1h (último início 16:00)
+const START_DAY_MIN = 8 * 60;
+const END_DAY_MIN   = 17 * 60;
+const SLOT_MIN      = 60;
+
+// Serviços
+const servicos = [
+  { id: "estetica_pes",       nome: "Estética dos Pés",         precoTexto: "R$ 40,00",              duracao: 60 },
+  { id: "estetica_maos",      nome: "Estética das Mãos",        precoTexto: "R$ 35,00",              duracao: 60 },
+  { id: "podologia_completa", nome: "Podologia Completa",       precoTexto: "a partir de R$ 100,00", duracao: 60 },
+  { id: "plastica_pes",       nome: "Plástica dos Pés",         precoTexto: "R$ 80,00",              duracao: 60 }
+];
+
+let adminLogado = false;
+
+// Estado do calendário admin
+let currentYear  = new Date().getFullYear();
+let currentMonth = new Date().getMonth(); // 0..11
+let selectedDate = toDateInputValue(new Date()); // yyyy-mm-dd
+
+/* =========================
+   Utils
+========================= */
+function hhmmParaMinutos(hhmm){ const [h,m] = hhmm.split(":").map(Number); return h*60+m; }
+function minutosParaHHMM(min){ const h = String(Math.floor(min/60)).padStart(2,"0"); const m = String(min%60).padStart(2,"0"); return `${h}:${m}`; }
+function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){ return (aInicio < bInicio+bDur) && (bInicio < aInicio+aDur); }
+function toDateInputValue(d){
+  const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,"0"); const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+function gerarId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function soDigitos(s){ return (s||"").replace(/\D/g,""); }
+function isSunday(dateStr){
+  const [y,m,d] = dateStr.split("-").map(Number);
+  return new Date(y, m-1, d).getDay() === 0;
+}
+function isPastDate(dateStr){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const d = new Date(dateStr+"T00:00:00");
+  return d < hoje;
+}
+function isPastTimeOnDate(dateStr, hhmm){
+  const now = new Date();
+  const [h,m] = hhmm.split(":").map(Number);
+  const target = new Date(dateStr+"T00:00:00");
+  target.setHours(h, m, 0, 0);
+  return target <= now;
+}
+function gerarHorariosBase(){
+  const arr = [];
+  for(let m=START_DAY_MIN; m + SLOT_MIN <= END_DAY_MIN; m += SLOT_MIN){
+    arr.push(minutosParaHHMM(m));
+  }
+  return arr;
+}
+const horariosBase = gerarHorariosBase();
+
+/* =========================
+   Storage (migração)
+========================= */
+function getAgenda(){
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  let changed = false;
+  agenda = agenda.map(a=>{
+    if(!a.id){ a.id = gerarId(); changed = true; }
+    if(!a.duracao){ a.duracao = 60; changed = true; }
+    return a;
+  });
+  if(changed) localStorage.setItem("agenda", JSON.stringify(agenda));
+  return agenda;
+}
+function setAgenda(agenda){ localStorage.setItem("agenda", JSON.stringify(agenda)); }
+
+/* =========================
+   Cliente — serviços e horários
+========================= */
+function popularServicos(){
+  const sel = document.getElementById("servico");
+  sel.innerHTML = `<option value="" disabled selected>Selecione o serviço</option>`;
+  servicos.forEach(s=>{
+    const op = document.createElement("option");
+    op.value = s.id;
+    op.textContent = `${s.nome} — ${s.precoTexto} (${s.duracao/60}h)`;
+    sel.appendChild(op);
+  });
+  sel.onchange = atualizarHorarios;
+}
+
+function atualizarHorarios(){
+  const data = document.getElementById("data").value;
+  const selServico = document.getElementById("servico").value;
+  const horaSel = document.getElementById("hora");
+  const msg = document.getElementById("msgHorarios");
+
+  horaSel.innerHTML = "";
+
+  if(!data || !selServico){
+    msg.textContent = "Selecione data e serviço.";
+    return;
+  }
+  if(isSunday(data)){ msg.textContent = "Domingo indisponível. Escolha outro dia."; return; }
+  if(isPastDate(data)){ msg.textContent = "Data já passou. Escolha outra."; return; }
+
+  msg.textContent = "Carregando horários…";
+
+  const servico = servicos.find(s=>s.id===selServico);
+  const agenda = getAgenda();
+  const ocupados = agenda
+    .filter(a => a.data === data)
+    .map(a => ({inicio: hhmmParaMinutos(a.hora), dur: a.duracao}));
+
+  let disponiveis = 0;
+  for(const hr of horariosBase){
+    // Oculta horas passadas hoje
+    if(!isPastDate(data) && isPastTimeOnDate(data, hr)) continue;
+
+    const inicio = hhmmParaMinutos(hr);
+    const conflita = ocupados.some(o=>intervalosSobrepoem(inicio, servico.duracao, o.inicio, o.dur));
+    if(!conflita){
+      const op = document.createElement("option");
+      op.value = hr; op.textContent = hr;
+      horaSel.appendChild(op);
+      disponiveis++;
+    }
+  }
+  msg.textContent = (disponiveis>0) ? "Horários disponíveis:" : "Nenhum horário disponível nesta data.";
+}
+
+/* =========================
+   Cliente — agendar / cancelar
+========================= */
+function agendar(){
+  const nome = document.getElementById("nome").value.trim();
+  const contatoRaw = document.getElementById("contato").value.trim();
+  const data = document.getElementById("data").value;
+  const hora = document.getElementById("hora").value;
+  const servicoID = document.getElementById("servico").value;
+
+  if(!nome || !contatoRaw || !data || !hora || !servicoID){
+    alert("Preencha todos os campos."); return;
+  }
+  if(isSunday(data)){ alert("Domingo indisponível."); return; }
+  if(isPastDate(data)){ alert("Data já passou."); return; }
+  if(isPastTimeOnDate(data, hora)){ alert("Horário já passou."); return; }
+
+  const servico = servicos.find(s=>s.id===servicoID);
+  const agenda = getAgenda();
+
+  // mesmo slot (mesma data/hora) + conflito de duração (1h)
+  const inicio = hhmmParaMinutos(hora);
+  if(agenda.some(a => a.data===data && a.hora===hora)){
+    alert("Este horário já está ocupado."); atualizarHorarios(); return;
+  }
+  const conflita = agenda
+    .filter(a=>a.data===data)
+    .some(a=>intervalosSobrepoem(inicio, servico.duracao, hhmmParaMinutos(a.hora), a.duracao));
+  if(conflita){
+    alert("Conflito de horário. Escolha outro horário."); atualizarHorarios(); return;
+  }
+
+  const contato = soDigitos(contatoRaw);
+  const registro = {
+    id: gerarId(),
+    nome,
+    contato, // só dígitos
+    data,
+    hora,
+    servico: servico.nome,
+    precoTexto: servico.precoTexto,
+    duracao: servico.duracao
+  };
+  agenda.push(registro);
+  setAgenda(agenda);
+
+  document.getElementById("sucesso").style.display = "block";
+  setTimeout(()=>document.getElementById("sucesso").style.display="none", 3000);
+
+  mostrarAgenda(); atualizarHorarios();
+  if(adminLogado){ renderCalendario(); renderDia(selectedDate); renderProximos(); }
+
+  const msg =
+`Olá! 💅
+Novo agendamento:
+
+👤 ${nome}
+💬 Contato: +55 ${contato}
+💆 ${servico.nome}
+💵 ${servico.precoTexto}
+⏱️ ${servico.duracao/60}h
+📅 ${data}
+⏰ ${hora}`;
+  abrirWhatsApp(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`);
+}
+
+function abrirWhatsApp(url){
+  try{ window.location.href = url; } catch(e){ window.open(url, "_blank"); }
+}
+
+function mostrarAgenda(){
+  const wrap = document.getElementById("agenda");
+  const nomeBusca = (document.getElementById("nome").value || "").toLowerCase().trim();
+  const agenda = getAgenda().filter(a => a.nome.toLowerCase() === nomeBusca)
+                             .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
+
+  wrap.innerHTML = "";
+  if(agenda.length===0){ wrap.innerHTML = `<div class="muted">Nenhum agendamento encontrado.</div>`; return; }
+
+  agenda.forEach(a=>{
+    wrap.innerHTML += `
+      <div class="item">
+        <strong>${a.nome}</strong><br/>
+        ${a.servico} — ${a.precoTexto}<br/>
+        WhatsApp: +55 ${a.contato}<br/>
+        ${a.data} às ${a.hora}<br/>
+        <button class="btn-danger" onclick="cancelarCliente('${a.id}')">Cancelar</button>
+      </div>`;
+  });
+}
+
+function cancelarCliente(id){
+  if(!confirm("Deseja cancelar este agendamento?")) return;
+
+  const agenda = getAgenda();
+  const idx = agenda.findIndex(a=>a.id===id);
+  if(idx===-1) return;
+  const item = agenda[idx];
+
+  agenda.splice(idx,1);
+  setAgenda(agenda);
+
+  mostrarAgenda(); atualizarHorarios();
+  if(adminLogado){ renderCalendario(); renderDia(selectedDate); renderProximos(); }
+
+  const msg =
+`⚠️ Cancelamento pelo cliente
+
+👤 ${item.nome}
+💬 Contato: +55 ${item.contato}
+💆 ${item.servico}
+📅 ${item.data}
+⏰ ${item.hora}`;
+  abrirWhatsApp(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`);
+}
+
+/* =========================
+   Admin — login
+========================= */
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "1234";
+
+function mostrarLogin(){ document.getElementById("adminLogin").style.display = "block"; }
+function loginAdmin(){
+  const u = document.getElementById("adminUser").value;
+  const p = document.getElementById("adminPass").value;
+  if(u===ADMIN_USER && p===ADMIN_PASS){
+    adminLogado = true;
+    document.getElementById("adminLogin").style.display = "none";
+    document.getElementById("adminArea").style.display = "block";
+
+    // Seleciona automaticamente o próximo dia com agendamento (se existir)
+    const next = proximoDiaComAgenda() || toDateInputValue(new Date());
+    selectedDate = next;
+
+    buildHoursColumn();
+    renderCalendario();
+    renderDia(selectedDate);
+    renderProximos();
+  }else{
+    alert("Credenciais incorretas.");
+  }
+}
+function logoutAdmin(){
+  adminLogado = false;
+  document.getElementById("adminArea").style.display = "none";
+}
+
+/* =========================
+   Admin — calendário mensal
+========================= */
+function renderCalendario(){
+  const cal = document.getElementById("calendario");
+  const primeiro = new Date(currentYear, currentMonth, 1);
+  const ultimo = new Date(currentYear, currentMonth+1, 0);
+  const todayStr = toDateInputValue(new Date());
+  const mesNome = primeiro.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+
+  let html = `<h4 style="text-transform:capitalize; margin:6px 0 8px;">${mesNome}</h4>`;
+  html += `<table><thead><tr>`;
+  const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  dias.forEach(d=> html += `<th>${d}</th>`);
+  html += `</tr></thead><tbody><tr>`;
+
+  let diaSemana = primeiro.getDay();
+  for(let i=0;i<diaSemana;i++){ html += `<td></td>`; }
+
+  const agenda = getAgenda();
+
+  for(let dia=1; dia<=ultimo.getDate(); dia++){
+    const dataStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+    const items = agenda.filter(a=>a.data===dataStr).sort((a,b)=>a.hora.localeCompare(b.hora));
+    const isToday = (dataStr===todayStr);
+    const domingo = isSunday(dataStr);
+
+    html += `<td class="${isToday?'today':''}" onclick="selecionarDia('${dataStr}')" style="${domingo?'background:#fff5f5;':''}">`;
+    html += `<div class="day-number">${dia}</div>`;
+    if(items.length>0){
+      html += `<div class="cell-chips">`;
+      items.slice(0,4).forEach(it=>{ html += `<span class="chip">${it.hora}</span>`; });
+      if(items.length>4){ html += `<span class="chip">+${items.length-4}</span>`; }
+      html += `</div>`;
+    }
+    html += `</td>`;
+
+    if((dia + diaSemana) % 7 === 0) html += `</tr><tr>`;
+  }
+
+  html += `</tr></tbody></table>`;
+  cal.innerHTML = html;
+}
+function selecionarDia(dateStr){ selectedDate = dateStr; renderDia(selectedDate); }
+function mesAnterior(){ currentMonth--; if(currentMonth<0){ currentMonth=11; currentYear--; } renderCalendario(); }
+function mesSeguinte(){ currentMonth++; if(currentMonth>11){ currentMonth=0; currentYear++; } renderCalendario(); }
+
+/* =========================
+   Admin — visão do dia (Teams-like)
+========================= */
+function buildHoursColumn(){
+  const hoursCol = document.getElementById("hoursCol");
+  hoursCol.innerHTML = "";
+  for(let m=START_DAY_MIN; m<=END_DAY_MIN; m+=60){
+    const label = minutosParaHHMM(m);
+    hoursCol.innerHTML += `<div class="hour">${label}</div>`;
+  }
+}
+function renderDia(dateStr){
+  const titulo = document.getElementById("diaTitulo");
+  const slots = document.getElementById("daySlots");
+  const empty = document.getElementById("listaDiaVazia");
+
+  const d = new Date(dateStr);
+  titulo.textContent = d.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+
+  slots.innerHTML = "";
+  const agenda = getAgenda()
+    .filter(a=>a.data===dateStr)
+    .sort((a,b)=>a.hora.localeCompare(b.hora));
+
+  if(agenda.length===0){ empty.style.display = "block"; return; } else { empty.style.display = "none"; }
+
+  const pxPerMin = 64/60;
+  agenda.forEach(a=>{
+    const startMin = hhmmParaMinutos(a.hora);
+    const top = Math.max(0, (startMin - START_DAY_MIN) * pxPerMin);
+    const height = (a.duracao || 60) * pxPerMin;
+
+    const el = document.createElement("div");
+    el.className = "event";
+    el.style.top = `${top}px`;
+    el.style.height = `${height}px`;
+    el.innerHTML = `
+      <div class="title">${a.hora} · ${a.servico}</div>
+      <div class="meta">Cliente: <strong>${a.nome}</strong> — <span class="muted">${a.precoTexto}</span></div>
+      <div class="meta">WhatsApp: +55 ${a.contato || '-'}</div>
+      <div class="actions">
+        <button class="btn-danger" onclick="cancelarAdminById('${a.id}')">Cancelar</button>
+      </div>
+    `;
+    slots.appendChild(el);
+  });
+}
+function diaAnterior(){ const d = new Date(selectedDate); d.setDate(d.getDate()-1); selectedDate = toDateInputValue(d); renderDia(selectedDate); }
+function diaSeguinte(){ const d = new Date(selectedDate); d.setDate(d.getDate()+1); selectedDate = toDateInputValue(d); renderDia(selectedDate); }
+
+/* =========================
+   Admin — próximos agendamentos (lista)
+========================= */
+function proximoDiaComAgenda(){
+  const todayStr = toDateInputValue(new Date());
+  const agenda = getAgenda()
+    .filter(a => (a.data > todayStr) || (a.data === todayStr && !isPastTimeOnDate(a.data, a.hora)))
+    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
+  return agenda.length ? agenda[0].data : null;
+}
+
+function renderProximos(limit=20){
+  const wrap = document.getElementById("adminUpcoming");
+  const todayStr = toDateInputValue(new Date());
+  const lista = getAgenda()
+    .filter(a => (a.data > todayStr) || (a.data === todayStr && !isPastTimeOnDate(a.data, a.hora)))
+    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora))
+    .slice(0, limit);
+
+  wrap.innerHTML = "";
+  if(lista.length === 0){
+    wrap.innerHTML = `<div class="muted">Nenhum agendamento futuro.</div>`;
+    return;
+  }
+  lista.forEach(a=>{
+    wrap.innerHTML += `
+      <div class="item">
+        <strong>${a.data} — ${a.hora}</strong><br/>
+        ${a.servico} — ${a.precoTexto}<br/>
+        Cliente: ${a.nome} | WhatsApp: +55 ${a.contato}<br/>
+        <button class="btn-danger" onclick="cancelarAdminById('${a.id}')">Cancelar</button>
+      </div>`;
+  });
+}
+
+/* =========================
+   Admin — cancelar (mensagem ao cliente)
+========================= */
+function cancelarAdminById(id){
+  if(!confirm("Deseja cancelar este horário?")) return;
+
+  const agenda = getAgenda();
+  const idx = agenda.findIndex(a=>a.id===id);
+  if(idx===-1) return;
+  const item = agenda[idx];
+
+  agenda.splice(idx,1);
+  setAgenda(agenda);
+
+  // Mensagem ao cliente
+  const msgCliente =
+`Olá ${item.nome}! ❌
+Seu agendamento foi cancelado pelo administrador.
+${item.servico}
+📅 ${item.data} ⏰ ${item.hora}
+
+Se quiser remarcar, é só responder esta mensagem.`;
+  const foneCliente = `55${soDigitos(item.contato)}`;
+  if(foneCliente.length >= 12){
+    abrirWhatsApp(`https://wa.me/${foneCliente}?text=${encodeURIComponent(msgCliente)}`);
+  }else{
+    alert("Não foi possível enviar ao cliente (WhatsApp inválido).");
+  }
+
+  // Atualiza tudo
+  renderCalendario();
+  renderDia(selectedDate);
+  renderProximos();
+}
+
+/* =========================
+   Inicialização
+========================= */
+window.addEventListener('DOMContentLoaded', ()=>{
+  popularServicos();
+  document.getElementById("msgHorarios").textContent = "Selecione data e serviço.";
+  getAgenda(); // migração e cache
+  mostrarAgenda();
+});

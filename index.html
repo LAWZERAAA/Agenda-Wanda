@@ -10,8 +10,8 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <!-- CSS externo com cache busting -->
-  <link rel="stylesheet" href="./style.css?v=20260205-7" />
+  <!-- CSS externo com cache busting (mantenha seu style.css atual) -->
+  <link rel="stylesheet" href="./style.css?v=20260205-8" />
 </head>
 <body>
 
@@ -59,24 +59,6 @@
     <div id="adminArea">
       <div class="card soft" style="margin-bottom:12px;">
         <h3>Todos os Agendamentos (Ordem Cronológica)</h3>
-        <div class="admin-filters">
-          <input id="adminSearch" placeholder="Buscar por nome, serviço ou WhatsApp" oninput="renderAdminList()" />
-          <label class="inline">
-            <input id="adminOnlyFuture" type="checkbox" onchange="renderAdminList()" />
-            Mostrar apenas futuros
-          </label>
-        </div>
-        <div class="admin-filters">
-          <div>
-            <label class="small">De</label>
-            <input id="adminDateStart" type="date" onchange="renderAdminList()" />
-          </div>
-          <div>
-            <label class="small">Até</label>
-            <input id="adminDateEnd" type="date" onchange="renderAdminList()" />
-          </div>
-          <button class="btn-outline" onclick="limparFiltrosAdmin()">Limpar Filtros</button>
-        </div>
         <div class="legend">
           <span class="tag tag-past">Passado</span>
           <span class="tag tag-today">Hoje</span>
@@ -95,7 +77,7 @@
   </div>
 </div>
 
-<!-- JS externo com cache busting -->
-<script src="./script.js?v=0205-7" defer></script>
+<!-- JS externo com cache busting (ATUALIZE a versão ao fazer mudanças) -->
+<script src="./script.js?v=20260205-8" defer></script>
 </body>
 </html>

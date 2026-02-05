@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Se seu site é puro HTML/CSS/JS na raiz, basta enviar a raiz como artefato
+      # Seu site é estático (HTML/CSS/JS) na raiz
       - name: Upload static site as artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -37,4 +37,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-``

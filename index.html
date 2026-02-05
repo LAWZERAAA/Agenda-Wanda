@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agenda Wanda</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  font-family:Arial, sans-serif;
+  background:#f8f4f6;
+  padding:20px;
+}
+h1{color:#b03060;text-align:center}
+
+.container{
+  max-width:420px;
+  margin:auto;
+  background:#fff;
+  padding:20px;
+  border-radius:12px;
+  box-shadow:0 0 10px rgba(0,0,0,.1);
+}
+
+label{margin-top:12px;display:block;font-weight:bold}
+
+input,select,button{
+  width:100%;
+  padding:10px;
+  margin-top:5px;
+  border-radius:6px;
+  border:1px solid #ccc;
+}
+
+button{
+  background:#b03060;
+  color:#fff;
+  border:none;
+  margin-top:15px;
+  font-size:16px;
+  cursor:pointer;
+}
+button:hover{background:#92274f}
+
+.confirm-box{
+  margin-top:10px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.sucesso{
+  display:none;
+  margin-top:15px;
+  padding:12px;
+  background:#d4edda;
+  color:#155724;
+  border-radius:6px;
+  text-align:center;
+  font-weight:bold;
+  animation:pop 0.5s ease;
+}
+
+@keyframes pop{
+  0%{transform:scale(.5);opacity:0}
+  100%{transform:scale(1);opacity:1}
+}
+
+.item{
+  background:#f1e7ec;
+  padding:10px;
+  border-radius:6px;
+  margin-top:10px;
+  font-size:14px;
+}
+
+.cancelar{
+  background:#c0392b;
+  margin-top:8px;
+  font-size:14px;
+}
+.cancelar:hover{background:#a93226}
+</style>
+</head>
+
+<body>
+
+<h1>Agenda Wanda 💅</h1>
+
+<div class="container">
+
+<label>Nome da Cliente</label>
+<input id="nome">
+
+<label>Serviço</label>
+<select id="servico">
+  <option>Manicure</option>
+  <option>Pedicure</option>
+  <option>Podologia</option>
+</select>
+
+<label>Data</label>
+<input type="date" id="data" onchange="atualizarHorarios()">
+
+<label>Horário</label>
+<select id="hora"></select>
+
+<div class="confirm-box">
+  <input type="checkbox" id="confirmacao">
+  <span>Confirmo meu agendamento</span>
+</div>
+
+<button type="button" onclick="agendar()">Agendar</button>
+
+<div id="sucesso" class="sucesso">✅ Agendamento realizado com sucesso!</div>
+
+<div id="agenda"></div>
+
+</div>
+
+<script>
+const telefoneWhatsApp = "5519992880591; 
+const horariosBase = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00"];
+
+function atualizarHorarios(){
+  const data = document.getElementById("data").value;
+  const horaSelect = document.getElementById("hora");
+  horaSelect.innerHTML = "";
+
+  if(!data){
+    let opt = document.createElement("option");
+    opt.textContent = "Selecione uma data primeiro";
+    opt.disabled = true;
+    opt.selected = true;
+    horaSelect.appendChild(opt);
+    return;
+  }
+
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  let ocupados = agenda.filter(a => a.data === data).map(a => a.hora);
+
+  horariosBase.forEach(h => {
+    if(!ocupados.includes(h)){
+      let opt = document.createElement("option");
+      opt.value = h;
+      opt.textContent = h;
+      horaSelect.appendChild(opt);
+    }
+  });
+
+  if(horaSelect.options.length === 0){
+    let opt = document.createElement("option");
+    opt.textContent = "Nenhum horário disponível";
+    opt.disabled = true;
+    opt.selected = true;
+    horaSelect.appendChild(opt);
+  }
+}
+
+function agendar(){
+  const nome = document.getElementById("nome").value;
+  const servico = document.getElementById("servico").value;
+  const data = document.getElementById("data").value;
+  const hora = document.getElementById("hora").value;
+  const confirmado = document.getElementById("confirmacao").checked;
+  const sucesso = document.getElementById("sucesso");
+
+  sucesso.style.display="none";
+
+  if(!nome||!data||!hora){alert("Preencha todos os campos");return;}
+  if(!confirmado){alert("Confirme o agendamento");return;}
+
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  agenda.push({nome,servico,data,hora});
+  localStorage.setItem("agenda",JSON.stringify(agenda));
+
+  mostrarAgenda();
+  atualizarHorarios();
+
+  sucesso.style.display="block";
+  setTimeout(()=>sucesso.style.display="none",4000);
+
+  const msg =
+`Olá! 💅
+Novo agendamento:
+
+👤 ${nome}
+💆 ${servico}
+📅 ${data}
+⏰ ${hora}`;
+
+  window.open(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`,"_blank");
+
+  document.getElementById("confirmacao").checked=false;
+  document.getElementById("nome").value="";
+}
+
+function mostrarAgenda(){
+  const div = document.getElementById("agenda");
+  div.innerHTML="<h3>Horários Agendados</h3>";
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+
+  agenda.forEach((a,i)=>{
+    div.innerHTML+=`
+      <div class="item">
+        <strong>${a.nome}</strong><br>
+        ${a.servico}<br>
+        ${a.data} às ${a.hora}
+        <button class="cancelar" onclick="cancelar(${i})">Cancelar</button>
+      </div>`;
+  });
+}
+
+function cancelar(i){
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  agenda.splice(i,1);
+  localStorage.setItem("agenda",JSON.stringify(agenda));
+  mostrarAgenda();
+  atualizarHorarios();
+}
+
+// Inicializa ao carregar
+mostrarAgenda();
+atualizarHorarios();
+</script>
+
+</body>
+</html>

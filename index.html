@@ -42,13 +42,6 @@ button{
 }
 button:hover{background:#92274f}
 
-.confirm-box{
-  margin-top:10px;
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-
 .sucesso{
   display:none;
   margin-top:15px;
@@ -105,11 +98,6 @@ button:hover{background:#92274f}
 <label>Horário</label>
 <select id="hora"></select>
 
-<div class="confirm-box">
-  <input type="checkbox" id="confirmacao">
-  <span>Confirmo meu agendamento</span>
-</div>
-
 <button type="button" onclick="agendar()">Agendar</button>
 
 <div id="sucesso" class="sucesso">✅ Agendamento realizado com sucesso!</div>
@@ -119,7 +107,7 @@ button:hover{background:#92274f}
 </div>
 
 <script>
-const telefoneWhatsApp = "5519992880591; 
+const telefoneWhatsApp = "5519992880591"; 
 const horariosBase = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00"];
 
 function atualizarHorarios(){
@@ -162,13 +150,11 @@ function agendar(){
   const servico = document.getElementById("servico").value;
   const data = document.getElementById("data").value;
   const hora = document.getElementById("hora").value;
-  const confirmado = document.getElementById("confirmacao").checked;
   const sucesso = document.getElementById("sucesso");
 
   sucesso.style.display="none";
 
   if(!nome||!data||!hora){alert("Preencha todos os campos");return;}
-  if(!confirmado){alert("Confirme o agendamento");return;}
 
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
   agenda.push({nome,servico,data,hora});
@@ -191,7 +177,6 @@ Novo agendamento:
 
   window.open(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`,"_blank");
 
-  document.getElementById("confirmacao").checked=false;
   document.getElementById("nome").value="";
 }
 

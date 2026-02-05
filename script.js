@@ -301,10 +301,10 @@ function passesFilters(item){
 
   // filtro somente futuros (considera data e hora)
   if(onlyFuture){
-    if(item.data < toDateInputValue(new Date())) return false;
-    if(item.data === toDateInputValue(new Date()) && isPastTimeOnDate(item.data, item.hora)) return false;
+    const hoje = toDateInputValue(new Date());
+    if(item.data < hoje) return false;
+    if(item.data === hoje && isPastTimeOnDate(item.data, item.hora)) return false;
   }
-
   return true;
 }
 
@@ -416,3 +416,53 @@ Se quiser remarcar, é só responder esta mensagem.`;
     alert("Não foi possível enviar ao cliente (WhatsApp inválido).");
   }
 
+  // Atualiza lista admin
+  renderAdminList();
+}
+
+/* =========================
+   Exportar CSV
+========================= */
+function exportarCSV(){
+  const agenda = getAgenda()
+    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora))
+    .filter(passesFilters);
+
+  if(agenda.length === 0){
+    alert("Não há agendamentos (ou filtros zeraram a lista).");
+    return;
+  }
+
+  const headers = ["id","nome","contato","servico","preco","duracao_min","data","hora"];
+  const linhas = agenda.map(a => ([
+    a.id,
+    `"${(a.nome||"").replace(/"/g,'""')}"`,
+    `"${(a.contato||"").replace(/"/g,'""')}"`,
+    `"${(a.servico||"").replace(/"/g,'""')}"`,
+    `"${(a.precoTexto||"").replace(/"/g,'""')}"`,
+    a.duracao || 60,
+    a.data,
+    a.hora
+  ].join(",")));
+
+  const csv = [headers.join(","), ...linhas].join("\n");
+  const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `agendamentos_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+/* =========================
+   Inicialização
+========================= */
+window.addEventListener('DOMContentLoaded', ()=>{
+  popularServicos();
+  document.getElementById("msgHorarios").textContent = "Selecione data e serviço.";
+  getAgenda(); // migração/garante IDs
+  mostrarAgenda();
+});

@@ -1,3 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Sistema de Agendamentos</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background: #f8f8f8;
+  padding: 20px;
+  color: #333;
+}
+h2,h3{
+  text-align:center;
+}
+.container{
+  max-width:500px;
+  margin:auto;
+  background:#fff;
+  padding:20px;
+  border-radius:10px;
+  box-shadow:0 0 10px rgba(0,0,0,0.1);
+}
+
+label{
+  font-weight: bold;
+}
+input, select{
+  width:100%;
+  padding:10px;
+  margin:8px 0;
+  border:1px solid #ccc;
+  border-radius:5px;
+}
+
+button{
+  width:100%;
+  padding:12px;
+  background:#4CAF50;
+  border:none;
+  color:#fff;
+  font-size:16px;
+  border-radius:5px;
+  cursor:pointer;
+}
+button:hover{
+  background:#45a049;
+}
+
+.item{
+  background:#eee;
+  padding:10px;
+  margin:10px 0;
+  border-radius:5px;
+}
+
+.cancelar{
+  background:#d9534f;
+  margin-top:10px;
+}
+.cancelar:hover{
+  background:#c9302c;
+}
+
+#sucesso{
+  display:none;
+  padding:10px;
+  background:#4CAF50;
+  color:#fff;
+  margin-top:15px;
+  border-radius:5px;
+}
+
+#adminArea, #adminLogin{
+  margin-top:20px;
+  display:none;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Agendamento</h2>
+
+  <label>Nome</label>
+  <input id="nome" type="text" placeholder="Seu nome" oninput="mostrarAgenda()">
+
+  <label>Serviço</label>
+  <select id="servico"></select>
+
+  <label>Data</label>
+  <input id="data" type="date" onchange="atualizarHorarios()">
+
+  <label>Horário</label>
+  <select id="hora"></select>
+
+  <button onclick="agendar()">Agendar</button>
+
+  <div id="sucesso">Agendado com sucesso!</div>
+
+  <h3>Meus Agendamentos</h3>
+  <div id="agenda"></div>
+
+  <hr>
+
+  <button onclick="mostrarLogin()">Área do Administrador</button>
+
+  <div id="adminLogin">
+    <h3>Login do Administrador</h3>
+    <input id="adminUser" placeholder="Usuário">
+    <input id="adminPass" type="password" placeholder="Senha">
+    <button onclick="loginAdmin()">Entrar</button>
+  </div>
+
+  <div id="adminArea">
+    <h3>Painel Administrativo</h3>
+    <div id="agendaAdmin"></div>
+    <button onclick="logoutAdmin()">Sair</button>
+  </div>
+</div>
+
+
+<!-- =========================================
+     JAVASCRIPT COMPLETO E FUNCIONANDO
+========================================= -->
 <script>
 // =========================
 // CONFIGURAÇÃO
@@ -5,10 +132,8 @@
 
 const telefoneWhatsApp = "5519992880591";
 
-// Horários possíveis
 const horariosBase = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00"];
 
-// Serviços: preço e duração (todos = 1h)
 const servicos = [
   { id: "estetica_pes", nome: "Estética dos Pés", precoTexto: "R$ 40,00", duracao: 60 },
   { id: "estetica_maos", nome: "Estética das Mãos", precoTexto: "R$ 35,00", duracao: 60 },
@@ -41,31 +166,25 @@ function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){
 
 function popularServicos(){
   const sel = document.getElementById("servico");
-  if(!sel) return;
-
   sel.innerHTML = `<option value="" disabled selected>Selecione o serviço</option>`;
-
   servicos.forEach(s => {
     const op = document.createElement("option");
     op.value = s.id;
     op.textContent = `${s.nome} — ${s.precoTexto} (1h)`;
     sel.appendChild(op);
   });
-
   sel.onchange = atualizarHorarios;
 }
 
 
 // =========================
-// MOSTRAR HORÁRIOS DISPONÍVEIS
+// ATUALIZAR HORÁRIOS
 // =========================
 
 function atualizarHorarios(){
-  const data = document.getElementById("data")?.value;
-  const servicoID = document.getElementById("servico")?.value;
+  const data = document.getElementById("data").value;
+  const servicoID = document.getElementById("servico").value;
   const horaSel = document.getElementById("hora");
-
-  if(!horaSel) return;
   horaSel.innerHTML = "";
 
   if(!data || !servicoID){
@@ -78,8 +197,8 @@ function atualizarHorarios(){
   }
 
   const servico = servicos.find(s => s.id === servicoID);
-
   const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+
   const ocupados = agenda
       .filter(a => a.data === data)
       .map(a => ({
@@ -89,7 +208,9 @@ function atualizarHorarios(){
 
   horariosBase.forEach(hr => {
     const inicio = hhmmParaMinutos(hr);
-    const conflita = ocupados.some(o => intervalosSobrepoem(inicio, servico.duracao, o.inicio, o.dur));
+    const conflita = ocupados.some(a =>
+      intervalosSobrepoem(inicio, servico.duracao, a.inicio, a.dur)
+    );
 
     if(!conflita){
       const op = document.createElement("option");
@@ -114,10 +235,10 @@ function atualizarHorarios(){
 // =========================
 
 function agendar(){
-  const nome = document.getElementById("nome")?.value?.trim();
-  const data = document.getElementById("data")?.value;
-  const hora = document.getElementById("hora")?.value;
-  const servicoID = document.getElementById("servico")?.value;
+  const nome = document.getElementById("nome").value.trim();
+  const data = document.getElementById("data").value;
+  const hora = document.getElementById("hora").value;
+  const servicoID = document.getElementById("servico").value;
 
   if(!nome || !data || !hora || !servicoID){
     alert("Preencha todos os campos.");
@@ -125,27 +246,19 @@ function agendar(){
   }
 
   const servico = servicos.find(s => s.id === servicoID);
-
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
-  // Verificação final de conflito
   const inicio = hhmmParaMinutos(hora);
   const conflito = agenda
       .filter(a => a.data === data)
-      .some(a => intervalosSobrepoem(
-          inicio,
-          servico.duracao,
-          hhmmParaMinutos(a.hora),
-          a.duracao
-      ));
+      .some(a => intervalosSobrepoem(inicio, servico.duracao, hhmmParaMinutos(a.hora), a.duracao));
 
   if(conflito){
-    alert("Esse horário acabou de ficar indisponível.");
+    alert("Este horário já está ocupado.");
     atualizarHorarios();
     return;
   }
 
-  // Salvar agenda
   agenda.push({
     nome,
     data,
@@ -162,7 +275,9 @@ function agendar(){
 
   if(adminLogado) mostrarAgendaAdmin();
 
-  // Enviar WhatsApp
+  document.getElementById("sucesso").style.display = "block";
+  setTimeout(() => document.getElementById("sucesso").style.display = "none", 3000);
+
   const msg =
 `Olá! 💅
 Novo agendamento:
@@ -175,8 +290,6 @@ Novo agendamento:
 ⏰ ${hora}`;
 
   window.open(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`);
-
-  document.getElementById("nome").value = "";
 }
 
 
@@ -186,26 +299,27 @@ Novo agendamento:
 
 function mostrarAgenda(){
   const div = document.getElementById("agenda");
-  const nomeBusca = document.getElementById("nome")?.value?.toLowerCase().trim();
+  const nomeBusca = document.getElementById("nome").value.toLowerCase().trim();
+
   const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
-  div.innerHTML = "<h3>Meus Agendamentos</h3>";
+  div.innerHTML = "";
 
   const meus = agenda.filter(a => a.nome.toLowerCase() === nomeBusca);
 
   if(meus.length === 0){
-    div.innerHTML += "<p>Nenhum agendamento encontrado.</p>";
+    div.innerHTML = "<p>Nenhum agendamento encontrado.</p>";
     return;
   }
 
   meus.forEach((a,i) => {
     div.innerHTML += `
-      <div class="item">
-        <strong>${a.nome}</strong><br>
-        ${a.servico} — ${a.precoTexto}<br>
-        ${a.data} às ${a.hora}<br>
-        <button onclick="cancelar(${i})">Cancelar</button>
-      </div>`;
+    <div class="item">
+      <strong>${a.nome}</strong><br>
+      ${a.servico} — ${a.precoTexto}<br>
+      ${a.data} às ${a.hora}<br>
+      <button class="cancelar" onclick="cancelar(${i})">Cancelar</button>
+    </div>`;
   });
 }
 
@@ -229,7 +343,11 @@ function cancelar(i){
 // =========================
 
 const ADMIN_USER = "admin";
-const ADMIN_PASS = "1234"; // por enquanto simples para evitar erros
+const ADMIN_PASS = "1234";
+
+function mostrarLogin(){
+  document.getElementById("adminLogin").style.display = "block";
+}
 
 function loginAdmin(){
   const u = document.getElementById("adminUser").value;
@@ -249,15 +367,15 @@ function mostrarAgendaAdmin(){
   const div = document.getElementById("agendaAdmin");
   const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
-  div.innerHTML = "<h3>Agenda Completa</h3>";
+  div.innerHTML = "";
 
   agenda.forEach(a => {
     div.innerHTML += `
-      <div class="item">
-        <strong>${a.nome}</strong><br>
-        ${a.servico} — ${a.precoTexto}<br>
-        ${a.data} às ${a.hora}
-      </div>`;
+    <div class="item">
+      <strong>${a.nome}</strong><br>
+      ${a.servico} — ${a.precoTexto}<br>
+      ${a.data} às ${a.hora}
+    </div>`;
   });
 }
 
@@ -273,8 +391,9 @@ function logoutAdmin(){
 
 window.onload = () => {
   popularServicos();
-  mostrarAgenda();
   atualizarHorarios();
 };
-
 </script>
+
+</body>
+</html>

@@ -1,323 +1,280 @@
 <script>
-/* =========================
-   CONFIGURAÇÃO
-========================= */
+// =========================
+// CONFIGURAÇÃO
+// =========================
+
 const telefoneWhatsApp = "5519992880591";
 
-// Horários de início possíveis (início do expediente com passos de 1h)
+// Horários possíveis
 const horariosBase = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00"];
 
-// Tabela de serviços (preço e duração em minutos)
+// Serviços: preço e duração (todos = 1h)
 const servicos = [
-  { id: "estetica_pes",     nome: "Estética dos Pés",         preco: 40,  precoTexto: "R$ 40,00",           duracao: 60 },
-  { id: "estetica_maos",    nome: "Estética das Mãos",        preco: 35,  precoTexto: "R$ 35,00",           duracao: 60 },
-  { id: "podologia_completa", nome: "Podologia Completa",     preco: 100, precoTexto: "a partir de R$ 100,00", duracao: 60 },
-  { id: "plastica_pes",     nome: "Plástica dos Pés",         preco: 80,  precoTexto: "R$ 80,00",           duracao: 60 },
+  { id: "estetica_pes", nome: "Estética dos Pés", precoTexto: "R$ 40,00", duracao: 60 },
+  { id: "estetica_maos", nome: "Estética das Mãos", precoTexto: "R$ 35,00", duracao: 60 },
+  { id: "podologia_completa", nome: "Podologia Completa", precoTexto: "a partir de R$ 100,00", duracao: 60 },
+  { id: "plastica_pes", nome: "Plástica dos Pés", precoTexto: "R$ 80,00", duracao: 60 }
 ];
 
 let adminLogado = false;
 
-/* =========================
-   UTILITÁRIOS DE DATA/HORA
-========================= */
+
+// =========================
+// FUNÇÕES DE HORA
+// =========================
+
 function hhmmParaMinutos(hhmm){
   const [h,m] = hhmm.split(":").map(Number);
   return h*60 + m;
 }
-function minutosParaHHMM(min){
-  const h = Math.floor(min/60).toString().padStart(2,"0");
-  const m = (min%60).toString().padStart(2,"0");
-  return `${h}:${m}`;
-}
-// Verifica sobreposição entre [inicio1, fim1) e [inicio2, fim2)
-function intervalosSobrepoem(inicio1Min, dur1Min, inicio2Min, dur2Min){
-  const fim1 = inicio1Min + dur1Min;
-  const fim2 = inicio2Min + dur2Min;
-  return (inicio1Min < fim2) && (inicio2Min < fim1);
-}
-function obterServicoSelecionado(){
-  const sel = document.getElementById("servico");
-  if(!sel) return null;
-  const id = sel.value;
-  return servicos.find(s => s.id === id) || null;
+
+function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){
+  const aFim = aInicio + aDur;
+  const bFim = bInicio + bDur;
+  return (aInicio < bFim) && (bInicio < aFim);
 }
 
-/* =========================
-   UI: SERVIÇOS
-========================= */
+
+// =========================
+// POPULAR SERVIÇOS
+// =========================
+
 function popularServicos(){
   const sel = document.getElementById("servico");
   if(!sel) return;
 
-  sel.innerHTML = `<option value="" selected disabled>Selecione um serviço</option>`;
+  sel.innerHTML = `<option value="" disabled selected>Selecione o serviço</option>`;
+
   servicos.forEach(s => {
-    const opt = document.createElement("option");
-    opt.value = s.id;
-    opt.textContent = `${s.nome} — ${s.precoTexto} (${(s.duracao/60)}h)`;
-    sel.appendChild(opt);
+    const op = document.createElement("option");
+    op.value = s.id;
+    op.textContent = `${s.nome} — ${s.precoTexto} (1h)`;
+    sel.appendChild(op);
   });
 
-  sel.addEventListener("change", () => {
-    mostrarDetalhesServico();
-    atualizarHorarios(); // recalcula conforme duração
-  });
-}
-function mostrarDetalhesServico(){
-  const box = document.getElementById("detalhesServico");
-  if(!box) return;
-
-  const s = obterServicoSelecionado();
-  if(!s){
-    box.innerHTML = "";
-    return;
-  }
-  box.innerHTML = `
-    <div><strong>Serviço:</strong> ${s.nome}</div>
-    <div><strong>Valor:</strong> ${s.precoTexto}</div>
-    <div><strong>Duração:</strong> ${(s.duracao/60)}h</div>
-  `;
+  sel.onchange = atualizarHorarios;
 }
 
-/* =========================
-   HORÁRIOS DISPONÍVEIS
-========================= */
+
+// =========================
+// MOSTRAR HORÁRIOS DISPONÍVEIS
+// =========================
+
 function atualizarHorarios(){
   const data = document.getElementById("data")?.value;
-  const horaSelect = document.getElementById("hora");
-  const s = obterServicoSelecionado();
+  const servicoID = document.getElementById("servico")?.value;
+  const horaSel = document.getElementById("hora");
 
-  if(!horaSelect) return;
-  horaSelect.innerHTML = "";
+  if(!horaSel) return;
+  horaSel.innerHTML = "";
 
-  if(!data || !s){
-    const opt = document.createElement("option");
-    opt.textContent = !data ? "Selecione uma data primeiro" : "Selecione um serviço";
-    opt.disabled = true;
-    opt.selected = true;
-    horaSelect.appendChild(opt);
+  if(!data || !servicoID){
+    const op = document.createElement("option");
+    op.textContent = "Selecione data e serviço";
+    op.disabled = true;
+    op.selected = true;
+    horaSel.appendChild(op);
     return;
   }
 
+  const servico = servicos.find(s => s.id === servicoID);
+
   const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  const ocupadosDoDia = agenda
-    .filter(a => a.data === data)
-    .map(a => ({
-      inicioMin: hhmmParaMinutos(a.hora),
-      durMin: a.duracao || 60 // retrocompatível
-    }));
+  const ocupados = agenda
+      .filter(a => a.data === data)
+      .map(a => ({
+          inicio: hhmmParaMinutos(a.hora),
+          dur: a.duracao
+      }));
 
-  const fimExpedienteMin = hhmmParaMinutos(horariosBase[horariosBase.length-1]) + 60; // última hora + 1h
+  horariosBase.forEach(hr => {
+    const inicio = hhmmParaMinutos(hr);
+    const conflita = ocupados.some(o => intervalosSobrepoem(inicio, servico.duracao, o.inicio, o.dur));
 
-  let disponiveis = 0;
-  horariosBase.forEach(h => {
-    const inicioMin = hhmmParaMinutos(h);
-    // respeita o fim do expediente
-    if(inicioMin + s.duracao > fimExpedienteMin) return;
-
-    const conflita = ocupadosDoDia.some(ag =>
-      intervalosSobrepoem(inicioMin, s.duracao, ag.inicioMin, ag.durMin)
-    );
     if(!conflita){
-      const opt = document.createElement("option");
-      opt.value = h;
-      opt.textContent = h;
-      horaSelect.appendChild(opt);
-      disponiveis++;
+      const op = document.createElement("option");
+      op.value = hr;
+      op.textContent = hr;
+      horaSel.appendChild(op);
     }
   });
 
-  if(disponiveis === 0){
-    const opt = document.createElement("option");
-    opt.textContent = "Nenhum horário disponível";
-    opt.disabled = true;
-    opt.selected = true;
-    horaSelect.appendChild(opt);
+  if(horaSel.options.length === 0){
+    const op = document.createElement("option");
+    op.textContent = "Nenhum horário disponível";
+    op.disabled = true;
+    op.selected = true;
+    horaSel.appendChild(op);
   }
 }
 
-/* =========================
-   AGENDAR / CANCELAR
-========================= */
+
+// =========================
+// AGENDAR
+// =========================
+
 function agendar(){
-  const nome = document.getElementById("nome").value?.trim();
-  const data = document.getElementById("data").value;
-  const hora = document.getElementById("hora").value;
-  const sucesso = document.getElementById("sucesso");
-  const selecionado = obterServicoSelecionado();
+  const nome = document.getElementById("nome")?.value?.trim();
+  const data = document.getElementById("data")?.value;
+  const hora = document.getElementById("hora")?.value;
+  const servicoID = document.getElementById("servico")?.value;
 
-  if(sucesso) sucesso.style.display = "none";
-
-  if(!nome || !data || !hora || !selecionado){
-    alert("Preencha todos os campos corretamente (nome, serviço, data e horário).");
+  if(!nome || !data || !hora || !servicoID){
+    alert("Preencha todos os campos.");
     return;
   }
 
-  // Valida conflito no momento do agendamento
-  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  const inicioMin = hhmmParaMinutos(hora);
-  const conflita = agenda
-    .filter(a => a.data === data)
-    .some(a => intervalosSobrepoem(
-      inicioMin, selecionado.duracao,
-      hhmmParaMinutos(a.hora), a.duracao || 60
-    ));
+  const servico = servicos.find(s => s.id === servicoID);
 
-  if(conflita){
-    alert("Este horário acabou de ficar indisponível. Atualizando opções…");
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+
+  // Verificação final de conflito
+  const inicio = hhmmParaMinutos(hora);
+  const conflito = agenda
+      .filter(a => a.data === data)
+      .some(a => intervalosSobrepoem(
+          inicio,
+          servico.duracao,
+          hhmmParaMinutos(a.hora),
+          a.duracao
+      ));
+
+  if(conflito){
+    alert("Esse horário acabou de ficar indisponível.");
     atualizarHorarios();
     return;
   }
 
-  const registro = {
+  // Salvar agenda
+  agenda.push({
     nome,
     data,
     hora,
-    servicoId: selecionado.id,
-    servicoNome: selecionado.nome,
-    precoTexto: selecionado.precoTexto,
-    duracao: selecionado.duracao
-  };
+    servico: servico.nome,
+    precoTexto: servico.precoTexto,
+    duracao: servico.duracao
+  });
 
-  agenda.push(registro);
   localStorage.setItem("agenda", JSON.stringify(agenda));
 
   mostrarAgenda();
   atualizarHorarios();
+
   if(adminLogado) mostrarAgendaAdmin();
 
-  if(sucesso){
-    sucesso.style.display = "block";
-    setTimeout(() => sucesso.style.display = "none", 4000);
-  }
-
+  // Enviar WhatsApp
   const msg =
 `Olá! 💅
 Novo agendamento:
 
 👤 ${nome}
-💆 ${selecionado.nome}
-💵 ${selecionado.precoTexto}
-⏱️ ${(selecionado.duracao/60)}h
+💆 ${servico.nome}
+💵 ${servico.precoTexto}
+⏱️ 1h
 📅 ${data}
 ⏰ ${hora}`;
 
-  window.open(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`,"_blank");
+  window.open(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`);
 
   document.getElementById("nome").value = "";
 }
 
+
+// =========================
+// MOSTRAR AGENDA DO CLIENTE
+// =========================
+
 function mostrarAgenda(){
   const div = document.getElementById("agenda");
-  if(!div) return;
+  const nomeBusca = document.getElementById("nome")?.value?.toLowerCase().trim();
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
   div.innerHTML = "<h3>Meus Agendamentos</h3>";
-  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  const nomeCliente = document.getElementById("nome")?.value?.trim()?.toLowerCase() || "";
 
-  // Cliente só vê os seus (não expõe os demais)
-  agenda.forEach((a, i) => {
-    const nomeAg = (a.nome || "").trim().toLowerCase();
-    if(nomeCliente && nomeAg === nomeCliente){
-      const servicoLabel = a.servicoNome || a.servico || "Serviço";
-      const precoLabel = a.precoTexto ? ` — ${a.precoTexto}` : "";
-      div.innerHTML += `
-        <div class="item">
-          <strong>${a.nome}</strong><br>
-          ${servicoLabel}${precoLabel} (${(a.duracao||60)/60}h)<br>
-          ${a.data} às ${a.hora}
-          <button class="cancelar" onclick="cancelar(${i})">Cancelar</button>
-        </div>`;
-    }
-  });
+  const meus = agenda.filter(a => a.nome.toLowerCase() === nomeBusca);
 
-  if(div.innerHTML.trim() === "<h3>Meus Agendamentos</h3>"){
-    div.innerHTML += `<div class="item">Nenhum agendamento encontrado para o nome informado.</div>`;
+  if(meus.length === 0){
+    div.innerHTML += "<p>Nenhum agendamento encontrado.</p>";
+    return;
   }
+
+  meus.forEach((a,i) => {
+    div.innerHTML += `
+      <div class="item">
+        <strong>${a.nome}</strong><br>
+        ${a.servico} — ${a.precoTexto}<br>
+        ${a.data} às ${a.hora}<br>
+        <button onclick="cancelar(${i})">Cancelar</button>
+      </div>`;
+  });
 }
 
+
+// =========================
+// CANCELAR
+// =========================
+
 function cancelar(i){
-  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  if(i >= 0 && i < agenda.length){
-    agenda.splice(i,1);
-    localStorage.setItem("agenda", JSON.stringify(agenda));
-  }
+  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  agenda.splice(i,1);
+  localStorage.setItem("agenda", JSON.stringify(agenda));
   mostrarAgenda();
   atualizarHorarios();
   if(adminLogado) mostrarAgendaAdmin();
 }
 
-/* =========================
-   ÁREA DO ADMIN
-   - Senha com hash SHA-256
-========================= */
+
+// =========================
+// ADMIN
+// =========================
+
 const ADMIN_USER = "admin";
-// SHA-256("1234") = 03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4
-const ADMIN_PASS_HASH = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
+const ADMIN_PASS = "1234"; // por enquanto simples para evitar erros
 
-async function sha256Hex(str){
-  const enc = new TextEncoder().encode(str);
-  const buf = await crypto.subtle.digest("SHA-256", enc);
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
-}
+function loginAdmin(){
+  const u = document.getElementById("adminUser").value;
+  const p = document.getElementById("adminPass").value;
 
-async function loginAdmin(){
-  const user = document.getElementById("adminUser").value;
-  const pass = document.getElementById("adminPass").value;
-  const passHash = await sha256Hex(pass);
-
-  if(user === ADMIN_USER && passHash === ADMIN_PASS_HASH){
+  if(u === ADMIN_USER && p === ADMIN_PASS){
     adminLogado = true;
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminArea").style.display = "block";
     mostrarAgendaAdmin();
   } else {
-    alert("Usuário ou senha incorretos");
+    alert("Usuário ou senha incorretos.");
   }
-}
-
-function mostrarLogin(){
-  const el = document.getElementById("adminLogin");
-  if(el) el.style.display = "block";
 }
 
 function mostrarAgendaAdmin(){
   const div = document.getElementById("agendaAdmin");
-  if(!div) return;
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
   div.innerHTML = "<h3>Agenda Completa</h3>";
-  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  agenda
-    .sort((a,b) => (a.data + a.hora).localeCompare(b.data + b.hora))
-    .forEach(a => {
-      const servicoLabel = a.servicoNome || a.servico || "Serviço";
-      const precoLabel = a.precoTexto ? ` — ${a.precoTexto}` : "";
-      div.innerHTML += `
-        <div class="item">
-          <strong>${a.nome}</strong><br>
-          ${servicoLabel}${precoLabel} (${(a.duracao||60)/60}h)<br>
-          ${a.data} às ${a.hora}
-        </div>`;
-    });
+
+  agenda.forEach(a => {
+    div.innerHTML += `
+      <div class="item">
+        <strong>${a.nome}</strong><br>
+        ${a.servico} — ${a.precoTexto}<br>
+        ${a.data} às ${a.hora}
+      </div>`;
+  });
 }
 
 function logoutAdmin(){
   adminLogado = false;
   document.getElementById("adminArea").style.display = "none";
-  document.getElementById("adminLogin").style.display = "none";
 }
 
-/* =========================
-   INICIALIZAÇÃO
-========================= */
-function wireEventos(){
-  const dataEl = document.getElementById("data");
-  if(dataEl){
-    dataEl.addEventListener("change", atualizarHorarios);
-  }
-}
-popularServicos();
-mostrarDetalhesServico();
-mostrarAgenda();
-wireEventos();
-atualizarHorarios();
+
+// =========================
+// INICIALIZAÇÃO
+// =========================
+
+window.onload = () => {
+  popularServicos();
+  mostrarAgenda();
+  atualizarHorarios();
+};
+
 </script>

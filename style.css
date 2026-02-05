@@ -106,7 +106,7 @@ button.btn-danger:hover{
 
 .muted{ color: var(--muted); }
 
-/* Lista “Meus Agendamentos” */
+/* Lista “Meus Agendamentos” (agora lista todos) */
 #agenda .item{
   border:1px solid var(--border);
   border-radius:10px;

@@ -22,9 +22,17 @@ let adminLogado = false;
 /* =========================
    Utils
 ========================= */
-function hhmmParaMinutos(hhmm){ const [h,m] = hhmm.split(":").map(Number); return h*60+m; }
-function minutosParaHHMM(min){ const h = String(Math.floor(min/60)).padStart(2,"0"); const m = String(min%60).padStart(2,"0"); return `${h}:${m}`; }
-function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){ return (aInicio < bInicio+bDur) && (bInicio < aInicio+aDur); }
+function hhmmParaMinutos(hhmm){ const [h,m] = (hhmm||"").split(":").map(Number); return (isNaN(h)||isNaN(m)) ? NaN : h*60+m; }
+function minutosParaHHMM(min){
+  if (typeof min !== "number" || isNaN(min)) return "";
+  const h = String(Math.floor(min/60)).padStart(2,"0");
+  const m = String(min%60).padStart(2,"0");
+  return `${h}:${m}`;
+}
+function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){
+  if ([aInicio,aDur,bInicio,bDur].some(v => typeof v!=="number" || isNaN(v))) return false;
+  return (aInicio < bInicio+bDur) && (bInicio < aInicio+aDur);
+}
 function toDateInputValue(d){
   const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,"0"); const day = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`;
@@ -32,19 +40,23 @@ function toDateInputValue(d){
 function gerarId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function soDigitos(s){ return (s||"").replace(/\D/g,""); }
 function isSunday(dateStr){
+  if(!dateStr) return false;
   const [y,m,d] = dateStr.split("-").map(Number);
-  return new Date(y, m-1, d).getDay() === 0;
+  const dt = new Date(y, m-1, d);
+  return dt.getDay() === 0;
 }
 function isPastDate(dateStr){
+  if(!dateStr) return false;
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const d = new Date(dateStr+"T00:00:00");
   return d < hoje;
 }
 function isPastTimeOnDate(dateStr, hhmm){
+  if(!dateStr || !hhmm) return false;
   const now = new Date();
   const [h,m] = hhmm.split(":").map(Number);
   const target = new Date(dateStr+"T00:00:00");
-  target.setHours(h, m, 0, 0);
+  target.setHours(h||0, m||0, 0, 0);
   return target <= now;
 }
 function gerarHorariosBase(){
@@ -57,20 +69,52 @@ function gerarHorariosBase(){
 const horariosBase = gerarHorariosBase();
 
 /* =========================
-   Storage (migração)
+   Storage (migração e saneamento)
 ========================= */
-function getAgenda(){
-  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  let changed = false;
-  agenda = agenda.map(a=>{
-    if(!a.id){ a.id = gerarId(); changed = true; }
-    if(!a.duracao){ a.duracao = 60; changed = true; }
-    return a;
-  });
-  if(changed) localStorage.setItem("agenda", JSON.stringify(agenda));
-  return agenda;
+function saneaRegistro(a){
+  // Corrige tipos e defaults
+  const sane = {...a};
+  if(!sane.id) sane.id = gerarId();
+  if(!sane.duracao || typeof sane.duracao!=="number") sane.duracao = 60;
+  if(typeof sane.nome !== "string") sane.nome = String(sane.nome||"").trim();
+  if(typeof sane.contato !== "string") sane.contato = soDigitos(sane.contato);
+  if(typeof sane.servico !== "string") sane.servico = String(sane.servico||"").trim();
+  if(typeof sane.precoTexto !== "string") sane.precoTexto = String(sane.precoTexto||"").trim();
+  if(typeof sane.data !== "string") sane.data = String(sane.data||"").trim();
+  if(typeof sane.hora !== "string") sane.hora = String(sane.hora||"").trim();
+  return sane;
 }
-function setAgenda(agenda){ localStorage.setItem("agenda", JSON.stringify(agenda)); }
+function isRegistroValido(a){
+  // Considero válido apenas se tiver data e hora no formato básico
+  return a && /^\d{4}-\d{2}-\d{2}$/.test(a.data||"") && /^\d{2}:\d{2}$/.test(a.hora||"");
+}
+function getAgenda(){
+  let raw;
+  try { raw = localStorage.getItem("agenda"); } catch(e){ raw = null; }
+  let lista = [];
+  if(raw){
+    try { lista = JSON.parse(raw) || []; } catch(e){
+      console.warn("⚠️ agenda corrompida no localStorage; limpando…", e);
+      lista = [];
+      try { localStorage.removeItem("agenda"); } catch(_) {}
+    }
+  }
+  // saneamento
+  const saneados = lista.map(saneaRegistro);
+  // separa inválidos
+  const validos = [], invalidos = [];
+  saneados.forEach(a => (isRegistroValido(a) ? validos : invalidos).push(a));
+  if(invalidos.length){
+    console.warn(`⚠️ Removendo ${invalidos.length} registro(s) inválido(s) do localStorage (sem data/hora).`, invalidos);
+    try { localStorage.setItem("agenda", JSON.stringify(validos)); } catch(_) {}
+  }
+  return validos;
+}
+function setAgenda(agenda){
+  try { localStorage.setItem("agenda", JSON.stringify(agenda)); } catch(e){
+    console.error("Erro ao salvar agenda:", e);
+  }
+}
 
 /* =========================
    Cliente — serviços e horários
@@ -137,8 +181,8 @@ function atualizarHorarios(){
    Cliente — agendar / cancelar
 ========================= */
 function agendar(){
-  const nome = document.getElementById("nome").value.trim();
-  const contatoRaw = document.getElementById("contato").value.trim();
+  const nome = (document.getElementById("nome").value||"").trim();
+  const contatoRaw = (document.getElementById("contato").value||"").trim();
   const data = document.getElementById("data").value;
   const hora = document.getElementById("hora").value;
   const servicoID = document.getElementById("servico").value;
@@ -206,8 +250,12 @@ function abrirWhatsApp(url){
 function mostrarAgenda(){
   const wrap = document.getElementById("agenda");
   const nomeBusca = (document.getElementById("nome").value || "").toLowerCase().trim();
-  const agenda = getAgenda().filter(a => a.nome.toLowerCase() === nomeBusca)
-                             .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
+  const agenda = getAgenda().filter(a => (a.nome||"").toLowerCase().trim() === nomeBusca)
+                             .sort((a,b)=>{
+                               const ka = `${a.data||"9999-99-99"} ${a.hora||"99:99"}`;
+                               const kb = `${b.data||"9999-99-99"} ${b.hora||"99:99"}`;
+                               return ka.localeCompare(kb);
+                             });
 
   wrap.innerHTML = "";
   if(agenda.length===0){ wrap.innerHTML = `<div class="muted">Nenhum agendamento encontrado.</div>`; return; }
@@ -257,8 +305,8 @@ const ADMIN_PASS = "1234";
 
 function mostrarLogin(){ document.getElementById("adminLogin").style.display = "block"; }
 function loginAdmin(){
-  const u = document.getElementById("adminUser").value;
-  const p = document.getElementById("adminPass").value;
+  const u = (document.getElementById("adminUser").value||"").trim();
+  const p = (document.getElementById("adminPass").value||"").trim();
   if(u===ADMIN_USER && p===ADMIN_PASS){
     adminLogado = true;
     document.getElementById("adminLogin").style.display = "none";
@@ -285,6 +333,7 @@ function statusBadge(item){
 }
 
 function formatarDataBr(yyyyMMdd){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(yyyyMMdd||"")) return yyyyMMdd||"-";
   const [y,m,d] = yyyyMMdd.split("-").map(Number);
   const dt = new Date(y, m-1, d);
   const semana = dt.toLocaleDateString('pt-BR', { weekday:'long' });
@@ -297,8 +346,15 @@ function formatarDataBr(yyyyMMdd){
 function renderAdminList(){
   const wrap = document.getElementById("adminList");
   const countEl = document.getElementById("adminCount");
-  const agenda = getAgenda()
-    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora)); // ordem cronológica
+
+  let agenda = getAgenda();
+
+  // Ordenação resiliente
+  agenda.sort((a,b)=>{
+    const ka = `${a.data||"9999-99-99"} ${a.hora||"99:99"}`;
+    const kb = `${b.data||"9999-99-99"} ${b.hora||"99:99"}`;
+    return ka.localeCompare(kb);
+  });
 
   wrap.innerHTML = "";
   countEl.textContent = `${agenda.length} registro(s)`;
@@ -312,6 +368,10 @@ function renderAdminList(){
   let atual = "";
   let grupoEl = null;
   agenda.forEach(item=>{
+    if(!isRegistroValido(item)){
+      console.warn("Ignorando registro inválido (sem data/hora):", item);
+      return;
+    }
     if(item.data !== atual){
       atual = item.data;
       grupoEl = document.createElement("div");
@@ -392,7 +452,11 @@ Se quiser remarcar, é só responder esta mensagem.`;
 ========================= */
 function exportarCSV(){
   const agenda = getAgenda()
-    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
+    .sort((a,b)=>{
+      const ka = `${a.data||"9999-99-99"} ${a.hora||"99:99"}`;
+      const kb = `${b.data||"9999-99-99"} ${b.hora||"99:99"}`;
+      return ka.localeCompare(kb);
+    });
 
   if(agenda.length === 0){
     alert("Não há agendamentos para exportar.");
@@ -407,8 +471,8 @@ function exportarCSV(){
     `"${(a.servico||"").replace(/"/g,'""')}"`,
     `"${(a.precoTexto||"").replace(/"/g,'""')}"`,
     a.duracao || 60,
-    a.data,
-    a.hora
+    a.data || "",
+    a.hora || ""
   ].join(",")));
 
   const csv = [headers.join(","), ...linhas].join("\n");
@@ -429,6 +493,7 @@ function exportarCSV(){
 window.addEventListener('DOMContentLoaded', ()=>{
   popularServicos();
   document.getElementById("msgHorarios").textContent = "Selecione data e serviço.";
-  getAgenda(); // migração/garante IDs
+  // migra + saneia imediatamente (evita travar o admin)
+  getAgenda();
   mostrarAgenda();
 });

@@ -1,36 +1,133 @@
 <script>
-const telefoneWhatsApp = "5519992880591"; 
-const horariosBase = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00"];
-let adminLogado = false; // 🔧 controle de admin
+/* =========================
+   CONFIGURAÇÃO
+========================= */
+const telefoneWhatsApp = "5519992880591";
 
+// Horários de início possíveis (início do expediente com passos de 1h)
+const horariosBase = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00"];
+
+// Tabela de serviços (preço e duração em minutos)
+const servicos = [
+  { id: "estetica_pes",     nome: "Estética dos Pés",         preco: 40,  precoTexto: "R$ 40,00",           duracao: 60 },
+  { id: "estetica_maos",    nome: "Estética das Mãos",        preco: 35,  precoTexto: "R$ 35,00",           duracao: 60 },
+  { id: "podologia_completa", nome: "Podologia Completa",     preco: 100, precoTexto: "a partir de R$ 100,00", duracao: 60 },
+  { id: "plastica_pes",     nome: "Plástica dos Pés",         preco: 80,  precoTexto: "R$ 80,00",           duracao: 60 },
+];
+
+let adminLogado = false;
+
+/* =========================
+   UTILITÁRIOS DE DATA/HORA
+========================= */
+function hhmmParaMinutos(hhmm){
+  const [h,m] = hhmm.split(":").map(Number);
+  return h*60 + m;
+}
+function minutosParaHHMM(min){
+  const h = Math.floor(min/60).toString().padStart(2,"0");
+  const m = (min%60).toString().padStart(2,"0");
+  return `${h}:${m}`;
+}
+// Verifica sobreposição entre [inicio1, fim1) e [inicio2, fim2)
+function intervalosSobrepoem(inicio1Min, dur1Min, inicio2Min, dur2Min){
+  const fim1 = inicio1Min + dur1Min;
+  const fim2 = inicio2Min + dur2Min;
+  return (inicio1Min < fim2) && (inicio2Min < fim1);
+}
+function obterServicoSelecionado(){
+  const sel = document.getElementById("servico");
+  if(!sel) return null;
+  const id = sel.value;
+  return servicos.find(s => s.id === id) || null;
+}
+
+/* =========================
+   UI: SERVIÇOS
+========================= */
+function popularServicos(){
+  const sel = document.getElementById("servico");
+  if(!sel) return;
+
+  sel.innerHTML = `<option value="" selected disabled>Selecione um serviço</option>`;
+  servicos.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = `${s.nome} — ${s.precoTexto} (${(s.duracao/60)}h)`;
+    sel.appendChild(opt);
+  });
+
+  sel.addEventListener("change", () => {
+    mostrarDetalhesServico();
+    atualizarHorarios(); // recalcula conforme duração
+  });
+}
+function mostrarDetalhesServico(){
+  const box = document.getElementById("detalhesServico");
+  if(!box) return;
+
+  const s = obterServicoSelecionado();
+  if(!s){
+    box.innerHTML = "";
+    return;
+  }
+  box.innerHTML = `
+    <div><strong>Serviço:</strong> ${s.nome}</div>
+    <div><strong>Valor:</strong> ${s.precoTexto}</div>
+    <div><strong>Duração:</strong> ${(s.duracao/60)}h</div>
+  `;
+}
+
+/* =========================
+   HORÁRIOS DISPONÍVEIS
+========================= */
 function atualizarHorarios(){
-  const data = document.getElementById("data").value;
+  const data = document.getElementById("data")?.value;
   const horaSelect = document.getElementById("hora");
+  const s = obterServicoSelecionado();
+
+  if(!horaSelect) return;
   horaSelect.innerHTML = "";
 
-  if(!data){
-    let opt = document.createElement("option");
-    opt.textContent = "Selecione uma data primeiro";
+  if(!data || !s){
+    const opt = document.createElement("option");
+    opt.textContent = !data ? "Selecione uma data primeiro" : "Selecione um serviço";
     opt.disabled = true;
     opt.selected = true;
     horaSelect.appendChild(opt);
     return;
   }
 
-  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  let ocupados = agenda.filter(a => a.data === data).map(a => a.hora);
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  const ocupadosDoDia = agenda
+    .filter(a => a.data === data)
+    .map(a => ({
+      inicioMin: hhmmParaMinutos(a.hora),
+      durMin: a.duracao || 60 // retrocompatível
+    }));
 
+  const fimExpedienteMin = hhmmParaMinutos(horariosBase[horariosBase.length-1]) + 60; // última hora + 1h
+
+  let disponiveis = 0;
   horariosBase.forEach(h => {
-    if(!ocupados.includes(h)){
-      let opt = document.createElement("option");
+    const inicioMin = hhmmParaMinutos(h);
+    // respeita o fim do expediente
+    if(inicioMin + s.duracao > fimExpedienteMin) return;
+
+    const conflita = ocupadosDoDia.some(ag =>
+      intervalosSobrepoem(inicioMin, s.duracao, ag.inicioMin, ag.durMin)
+    );
+    if(!conflita){
+      const opt = document.createElement("option");
       opt.value = h;
       opt.textContent = h;
       horaSelect.appendChild(opt);
+      disponiveis++;
     }
   });
 
-  if(horaSelect.options.length === 0){
-    let opt = document.createElement("option");
+  if(disponiveis === 0){
+    const opt = document.createElement("option");
     opt.textContent = "Nenhum horário disponível";
     opt.disabled = true;
     opt.selected = true;
@@ -38,119 +135,189 @@ function atualizarHorarios(){
   }
 }
 
+/* =========================
+   AGENDAR / CANCELAR
+========================= */
 function agendar(){
-  const nome = document.getElementById("nome").value;
-  const servico = document.getElementById("servico").value;
+  const nome = document.getElementById("nome").value?.trim();
   const data = document.getElementById("data").value;
   const hora = document.getElementById("hora").value;
   const sucesso = document.getElementById("sucesso");
+  const selecionado = obterServicoSelecionado();
 
-  sucesso.style.display="none";
+  if(sucesso) sucesso.style.display = "none";
 
-  if(!nome||!data||!hora||!servico){
-    alert("Preencha todos os campos corretamente");
+  if(!nome || !data || !hora || !selecionado){
+    alert("Preencha todos os campos corretamente (nome, serviço, data e horário).");
     return;
   }
 
-  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  agenda.push({nome,servico,data,hora});
-  localStorage.setItem("agenda",JSON.stringify(agenda));
+  // Valida conflito no momento do agendamento
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  const inicioMin = hhmmParaMinutos(hora);
+  const conflita = agenda
+    .filter(a => a.data === data)
+    .some(a => intervalosSobrepoem(
+      inicioMin, selecionado.duracao,
+      hhmmParaMinutos(a.hora), a.duracao || 60
+    ));
+
+  if(conflita){
+    alert("Este horário acabou de ficar indisponível. Atualizando opções…");
+    atualizarHorarios();
+    return;
+  }
+
+  const registro = {
+    nome,
+    data,
+    hora,
+    servicoId: selecionado.id,
+    servicoNome: selecionado.nome,
+    precoTexto: selecionado.precoTexto,
+    duracao: selecionado.duracao
+  };
+
+  agenda.push(registro);
+  localStorage.setItem("agenda", JSON.stringify(agenda));
 
   mostrarAgenda();
   atualizarHorarios();
-
-  // 🔧 Atualiza automaticamente o painel do admin
   if(adminLogado) mostrarAgendaAdmin();
 
-  sucesso.style.display="block";
-  setTimeout(()=>sucesso.style.display="none",4000);
+  if(sucesso){
+    sucesso.style.display = "block";
+    setTimeout(() => sucesso.style.display = "none", 4000);
+  }
 
   const msg =
 `Olá! 💅
 Novo agendamento:
 
 👤 ${nome}
-💆 ${servico}
+💆 ${selecionado.nome}
+💵 ${selecionado.precoTexto}
+⏱️ ${(selecionado.duracao/60)}h
 📅 ${data}
 ⏰ ${hora}`;
 
   window.open(`https://wa.me/${telefoneWhatsApp}?text=${encodeURIComponent(msg)}`,"_blank");
 
-  document.getElementById("nome").value="";
+  document.getElementById("nome").value = "";
 }
 
 function mostrarAgenda(){
   const div = document.getElementById("agenda");
-  div.innerHTML="<h3>Meus Agendamentos</h3>";
-  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  const nomeCliente = document.getElementById("nome").value;
+  if(!div) return;
 
-  agenda.forEach((a,i)=>{
-    div.innerHTML+=`
-      <div class="item">
-        <strong>${a.nome}</strong><br>
-        ${a.servico}<br>
-        ${a.data} às ${a.hora}
-        ${a.nome===nomeCliente ? 
-          `<button class="cancelar" onclick="cancelar(${i})">Cancelar</button>` 
-          : ""}
-      </div>`;
+  div.innerHTML = "<h3>Meus Agendamentos</h3>";
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  const nomeCliente = document.getElementById("nome")?.value?.trim()?.toLowerCase() || "";
+
+  // Cliente só vê os seus (não expõe os demais)
+  agenda.forEach((a, i) => {
+    const nomeAg = (a.nome || "").trim().toLowerCase();
+    if(nomeCliente && nomeAg === nomeCliente){
+      const servicoLabel = a.servicoNome || a.servico || "Serviço";
+      const precoLabel = a.precoTexto ? ` — ${a.precoTexto}` : "";
+      div.innerHTML += `
+        <div class="item">
+          <strong>${a.nome}</strong><br>
+          ${servicoLabel}${precoLabel} (${(a.duracao||60)/60}h)<br>
+          ${a.data} às ${a.hora}
+          <button class="cancelar" onclick="cancelar(${i})">Cancelar</button>
+        </div>`;
+    }
   });
+
+  if(div.innerHTML.trim() === "<h3>Meus Agendamentos</h3>"){
+    div.innerHTML += `<div class="item">Nenhum agendamento encontrado para o nome informado.</div>`;
+  }
 }
 
 function cancelar(i){
-  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  agenda.splice(i,1);
-  localStorage.setItem("agenda",JSON.stringify(agenda));
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  if(i >= 0 && i < agenda.length){
+    agenda.splice(i,1);
+    localStorage.setItem("agenda", JSON.stringify(agenda));
+  }
   mostrarAgenda();
   atualizarHorarios();
-
-  // 🔧 Atualiza admin automaticamente
   if(adminLogado) mostrarAgendaAdmin();
 }
 
-// 🔧 Área do administrador
-function mostrarLogin(){
-  document.getElementById("adminLogin").style.display="block";
+/* =========================
+   ÁREA DO ADMIN
+   - Senha com hash SHA-256
+========================= */
+const ADMIN_USER = "admin";
+// SHA-256("1234") = 03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4
+const ADMIN_PASS_HASH = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
+
+async function sha256Hex(str){
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-function loginAdmin(){
+async function loginAdmin(){
   const user = document.getElementById("adminUser").value;
   const pass = document.getElementById("adminPass").value;
+  const passHash = await sha256Hex(pass);
 
-  if(user==="admin" && pass==="1234"){
-    adminLogado = true; // <--- controle admin
-    document.getElementById("adminLogin").style.display="none";
-    document.getElementById("adminArea").style.display="block";
+  if(user === ADMIN_USER && passHash === ADMIN_PASS_HASH){
+    adminLogado = true;
+    document.getElementById("adminLogin").style.display = "none";
+    document.getElementById("adminArea").style.display = "block";
     mostrarAgendaAdmin();
   } else {
     alert("Usuário ou senha incorretos");
   }
 }
 
+function mostrarLogin(){
+  const el = document.getElementById("adminLogin");
+  if(el) el.style.display = "block";
+}
+
 function mostrarAgendaAdmin(){
   const div = document.getElementById("agendaAdmin");
-  div.innerHTML="<h3>Agenda Completa</h3>";
+  if(!div) return;
 
-  let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-
-  agenda.forEach((a)=>{
-    div.innerHTML+=`
-      <div class="item">
-        <strong>${a.nome}</strong><br>
-        ${a.servico}<br>
-        ${a.data} às ${a.hora}
-      </div>`;
-  });
+  div.innerHTML = "<h3>Agenda Completa</h3>";
+  const agenda = JSON.parse(localStorage.getItem("agenda")) || [];
+  agenda
+    .sort((a,b) => (a.data + a.hora).localeCompare(b.data + b.hora))
+    .forEach(a => {
+      const servicoLabel = a.servicoNome || a.servico || "Serviço";
+      const precoLabel = a.precoTexto ? ` — ${a.precoTexto}` : "";
+      div.innerHTML += `
+        <div class="item">
+          <strong>${a.nome}</strong><br>
+          ${servicoLabel}${precoLabel} (${(a.duracao||60)/60}h)<br>
+          ${a.data} às ${a.hora}
+        </div>`;
+    });
 }
 
 function logoutAdmin(){
-  adminLogado = false; // 🔧 reset do status admin
-  document.getElementById("adminArea").style.display="none";
-  document.getElementById("adminLogin").style.display="none";
+  adminLogado = false;
+  document.getElementById("adminArea").style.display = "none";
+  document.getElementById("adminLogin").style.display = "none";
 }
 
-// Inicializa ao carregar
+/* =========================
+   INICIALIZAÇÃO
+========================= */
+function wireEventos(){
+  const dataEl = document.getElementById("data");
+  if(dataEl){
+    dataEl.addEventListener("change", atualizarHorarios);
+  }
+}
+popularServicos();
+mostrarDetalhesServico();
 mostrarAgenda();
+wireEventos();
 atualizarHorarios();
 </script>

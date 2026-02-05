@@ -263,7 +263,7 @@ function loginAdmin(){
     adminLogado = true;
     document.getElementById("adminLogin").style.display = "none";
     document.getElementById("adminArea").style.display = "block";
-    renderAdminList(); // lista cronológica
+    renderAdminList(); // MOSTRA TUDO (sem filtros)
   }else{
     alert("Credenciais incorretas.");
   }
@@ -273,41 +273,9 @@ function logoutAdmin(){
   document.getElementById("adminArea").style.display = "none";
 }
 
-function limparFiltrosAdmin(){
-  document.getElementById("adminSearch").value = "";
-  document.getElementById("adminOnlyFuture").checked = false;
-  document.getElementById("adminDateStart").value = "";
-  document.getElementById("adminDateEnd").value = "";
-  renderAdminList();
-}
-
 /* =========================
-   Admin — render lista cronológica
+   Admin — render lista (sem filtros)
 ========================= */
-function passesFilters(item){
-  const q = (document.getElementById("adminSearch").value || "").toLowerCase().trim();
-  const onlyFuture = document.getElementById("adminOnlyFuture").checked;
-  const ds = document.getElementById("adminDateStart").value;
-  const de = document.getElementById("adminDateEnd").value;
-
-  // filtro texto
-  if(q){
-    const alvo = `${item.nome} ${item.servico} ${item.contato}`.toLowerCase();
-    if(!alvo.includes(q)) return false;
-  }
-  // filtro intervalo
-  if(ds && item.data < ds) return false;
-  if(de && item.data > de) return false;
-
-  // filtro somente futuros (considera data e hora)
-  if(onlyFuture){
-    const hoje = toDateInputValue(new Date());
-    if(item.data < hoje) return false;
-    if(item.data === hoje && isPastTimeOnDate(item.data, item.hora)) return false;
-  }
-  return true;
-}
-
 function statusBadge(item){
   const hoje = toDateInputValue(new Date());
   if(item.data < hoje) return {cls:"past", txt:"Passado"};
@@ -316,18 +284,27 @@ function statusBadge(item){
   return isPastTimeOnDate(item.data, item.hora) ? {cls:"past", txt:"Passado"} : {cls:"today", txt:"Hoje"};
 }
 
+function formatarDataBr(yyyyMMdd){
+  const [y,m,d] = yyyyMMdd.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  const semana = dt.toLocaleDateString('pt-BR', { weekday:'long' });
+  const dia = String(d).padStart(2,"0");
+  const mes = dt.toLocaleDateString('pt-BR', { month:'long' });
+  const ano = y;
+  return `${semana}, ${dia} de ${mes} de ${ano}`;
+}
+
 function renderAdminList(){
   const wrap = document.getElementById("adminList");
   const countEl = document.getElementById("adminCount");
   const agenda = getAgenda()
-    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora))
-    .filter(passesFilters);
+    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora)); // ordem cronológica
 
   wrap.innerHTML = "";
   countEl.textContent = `${agenda.length} registro(s)`;
 
   if(agenda.length === 0){
-    wrap.innerHTML = `<div class="muted">Nenhum agendamento encontrado para os filtros aplicados.</div>`;
+    wrap.innerHTML = `<div class="muted">Nenhum agendamento encontrado.</div>`;
     return;
   }
 
@@ -377,16 +354,6 @@ function renderAdminList(){
   });
 }
 
-function formatarDataBr(yyyyMMdd){
-  const [y,m,d] = yyyyMMdd.split("-").map(Number);
-  const dt = new Date(y, m-1, d);
-  const semana = dt.toLocaleDateString('pt-BR', { weekday:'long' });
-  const dia = String(d).padStart(2,"0");
-  const mes = dt.toLocaleDateString('pt-BR', { month:'long' });
-  const ano = y;
-  return `${semana}, ${dia} de ${mes} de ${ano}`;
-}
-
 /* =========================
    Admin — cancelar (mensagem ao cliente)
 ========================= */
@@ -421,15 +388,14 @@ Se quiser remarcar, é só responder esta mensagem.`;
 }
 
 /* =========================
-   Exportar CSV
+   Exportar CSV (sem filtros)
 ========================= */
 function exportarCSV(){
   const agenda = getAgenda()
-    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora))
-    .filter(passesFilters);
+    .sort((a,b)=>(a.data+a.hora).localeCompare(b.data+b.hora));
 
   if(agenda.length === 0){
-    alert("Não há agendamentos (ou filtros zeraram a lista).");
+    alert("Não há agendamentos para exportar.");
     return;
   }
 

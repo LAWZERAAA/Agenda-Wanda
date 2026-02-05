@@ -10,7 +10,8 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <link rel="stylesheet" href="style.css?v=20260205-1" />
+  <!-- CSS externo com cache busting -->
+  <link rel="stylesheet" href="./style.css?v=20260205-3" />
 </head>
 <body>
 
@@ -88,10 +89,16 @@
         </div>
       </div>
 
-      <!-- Próximos agendamentos (lista) -->
+      <!-- Próximos -->
       <div class="card" style="margin-top:12px;">
         <h3>Próximos Agendamentos</h3>
         <div id="adminUpcoming"></div>
+      </div>
+
+      <!-- Ações -->
+      <div class="card" style="margin-top:12px;">
+        <h3>Ações do Administrador</h3>
+        <button class="btn-outline" onclick="exportarCSV()">Exportar CSV</button>
       </div>
 
       <button class="btn-danger" onclick="logoutAdmin()">Sair</button>
@@ -99,7 +106,7 @@
   </div>
 </div>
 
-<!-- JS com cache busting (mude a versão quando publicar) -->
-<script src="script.js?v=20260205-1"></script>
+<!-- JS externo com cache busting -->
+<script src="./script.js?v=20260205-3"></script>
 </body>
 </html>

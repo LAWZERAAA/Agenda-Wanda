@@ -73,12 +73,30 @@ button:hover{background:#92274f}
   font-size:14px;
 }
 .cancelar:hover{background:#a93226}
+
+/* Botão pequeno admin */
+#adminBtn{
+  position:absolute;
+  top:10px;
+  right:10px;
+  background:#555;
+  color:#fff;
+  border:none;
+  padding:5px 10px;
+  font-size:12px;
+  border-radius:4px;
+  cursor:pointer;
+}
+#adminBtn:hover{background:#333}
 </style>
 </head>
 
 <body>
 
 <h1>Agenda Wanda 💅</h1>
+
+<!-- Botão pequeno para login admin -->
+<button id="adminBtn" onclick="mostrarLogin()">Admin</button>
 
 <div class="container">
 
@@ -108,8 +126,8 @@ button:hover{background:#92274f}
 </div>
 
 <!-- Área do Administrador -->
-<div id="adminLogin" class="container">
-  <h3>Área do Administrador</h3>
+<div id="adminLogin" class="container" style="display:none">
+  <h3>Login Administrador</h3>
   <label>Usuário</label>
   <input id="adminUser">
   <label>Senha</label>
@@ -120,6 +138,7 @@ button:hover{background:#92274f}
 <div id="adminArea" class="container" style="display:none">
   <h3>Agenda Completa</h3>
   <div id="agendaAdmin"></div>
+  <button onclick="logoutAdmin()">Sair</button>
 </div>
 
 <script>
@@ -227,12 +246,15 @@ function cancelar(i){
 }
 
 // Área do administrador
+function mostrarLogin(){
+  document.getElementById("adminLogin").style.display="block";
+}
+
 function loginAdmin(){
   const user = document.getElementById("adminUser").value;
   const pass = document.getElementById("adminPass").value;
 
-
-  if(user==="admin" && pass==="Wanda1234"){
+  if(user==="admin" && pass==="1234"){
     document.getElementById("adminLogin").style.display="none";
     document.getElementById("adminArea").style.display="block";
     mostrarAgendaAdmin();
@@ -256,6 +278,11 @@ function mostrarAgendaAdmin(){
   });
 }
 
+function logoutAdmin(){
+  document.getElementById("adminArea").style.display="none";
+  document.getElementById("adminLogin").style.display="none";
+}
+  
 // Inicializa ao carregar
 mostrarAgenda();
 atualizarHorarios();

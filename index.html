@@ -1,149 +1,7 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Agenda Wanda</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-body{
-  font-family:Arial, sans-serif;
-  background:#f8f4f6;
-  padding:20px;
-}
-h1{color:#b03060;text-align:center}
-
-.container{
-  max-width:420px;
-  margin:auto;
-  background:#fff;
-  padding:20px;
-  border-radius:12px;
-  box-shadow:0 0 10px rgba(0,0,0,.1);
-}
-
-label{margin-top:12px;display:block;font-weight:bold}
-
-input,select,button{
-  width:100%;
-  padding:10px;
-  margin-top:5px;
-  border-radius:6px;
-  border:1px solid #ccc;
-}
-
-button{
-  background:#b03060;
-  color:#fff;
-  border:none;
-  margin-top:15px;
-  font-size:16px;
-  cursor:pointer;
-}
-button:hover{background:#92274f}
-
-.sucesso{
-  display:none;
-  margin-top:15px;
-  padding:12px;
-  background:#d4edda;
-  color:#155724;
-  border-radius:6px;
-  text-align:center;
-  font-weight:bold;
-  animation:pop 0.5s ease;
-}
-
-@keyframes pop{
-  0%{transform:scale(.5);opacity:0}
-  100%{transform:scale(1);opacity:1}
-}
-
-.item{
-  background:#f1e7ec;
-  padding:10px;
-  border-radius:6px;
-  margin-top:10px;
-  font-size:14px;
-}
-
-.cancelar{
-  background:#c0392b;
-  margin-top:8px;
-  font-size:14px;
-}
-.cancelar:hover{background:#a93226}
-
-/* Botão pequeno admin */
-#adminBtn{
-  position:absolute;
-  top:10px;
-  right:10px;
-  background:#555;
-  color:#fff;
-  border:none;
-  padding:5px 10px;
-  font-size:12px;
-  border-radius:4px;
-  cursor:pointer;
-}
-#adminBtn:hover{background:#333}
-</style>
-</head>
-
-<body>
-
-<h1>Agenda Wanda 💅</h1>
-
-<!-- Botão pequeno para login admin -->
-<button id="adminBtn" onclick="mostrarLogin()">Admin</button>
-
-<div class="container">
-
-<label>Nome da Cliente</label>
-<input id="nome">
-
-<label>Serviço</label>
-<select id="servico">
-  <option value="" disabled selected>Selecione</option>
-  <option>Manicure</option>
-  <option>Pedicure</option>
-  <option>Podologia</option>
-</select>
-
-<label>Data</label>
-<input type="date" id="data" onchange="atualizarHorarios()">
-
-<label>Horário</label>
-<select id="hora"></select>
-
-<button type="button" onclick="agendar()">Agendar</button>
-
-<div id="sucesso" class="sucesso">✅ Agendamento realizado com sucesso!</div>
-
-<div id="agenda"></div>
-
-</div>
-
-<!-- Área do Administrador -->
-<div id="adminLogin" class="container" style="display:none">
-  <h3>Login Administrador</h3>
-  <label>Usuário</label>
-  <input id="adminUser">
-  <label>Senha</label>
-  <input type="password" id="adminPass">
-  <button onclick="loginAdmin()">Entrar</button>
-</div>
-
-<div id="adminArea" class="container" style="display:none">
-  <h3>Agenda Completa</h3>
-  <div id="agendaAdmin"></div>
-  <button onclick="logoutAdmin()">Sair</button>
-</div>
-
 <script>
 const telefoneWhatsApp = "5519992880591"; 
 const horariosBase = ["08:00","09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00"];
+let adminLogado = false; // 🔧 controle de admin
 
 function atualizarHorarios(){
   const data = document.getElementById("data").value;
@@ -195,11 +53,14 @@ function agendar(){
   }
 
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
-  agenda.push({nome,servico,data,hora,cliente:nome});
+  agenda.push({nome,servico,data,hora});
   localStorage.setItem("agenda",JSON.stringify(agenda));
 
   mostrarAgenda();
   atualizarHorarios();
+
+  // 🔧 Atualiza automaticamente o painel do admin
+  if(adminLogado) mostrarAgendaAdmin();
 
   sucesso.style.display="block";
   setTimeout(()=>sucesso.style.display="none",4000);
@@ -230,7 +91,7 @@ function mostrarAgenda(){
         <strong>${a.nome}</strong><br>
         ${a.servico}<br>
         ${a.data} às ${a.hora}
-        ${a.cliente===nomeCliente ? 
+        ${a.nome===nomeCliente ? 
           `<button class="cancelar" onclick="cancelar(${i})">Cancelar</button>` 
           : ""}
       </div>`;
@@ -243,9 +104,12 @@ function cancelar(i){
   localStorage.setItem("agenda",JSON.stringify(agenda));
   mostrarAgenda();
   atualizarHorarios();
+
+  // 🔧 Atualiza admin automaticamente
+  if(adminLogado) mostrarAgendaAdmin();
 }
 
-// Área do administrador
+// 🔧 Área do administrador
 function mostrarLogin(){
   document.getElementById("adminLogin").style.display="block";
 }
@@ -255,6 +119,7 @@ function loginAdmin(){
   const pass = document.getElementById("adminPass").value;
 
   if(user==="admin" && pass==="1234"){
+    adminLogado = true; // <--- controle admin
     document.getElementById("adminLogin").style.display="none";
     document.getElementById("adminArea").style.display="block";
     mostrarAgendaAdmin();
@@ -265,7 +130,8 @@ function loginAdmin(){
 
 function mostrarAgendaAdmin(){
   const div = document.getElementById("agendaAdmin");
-  div.innerHTML="";
+  div.innerHTML="<h3>Agenda Completa</h3>";
+
   let agenda = JSON.parse(localStorage.getItem("agenda")) || [];
 
   agenda.forEach((a)=>{
@@ -279,14 +145,12 @@ function mostrarAgendaAdmin(){
 }
 
 function logoutAdmin(){
+  adminLogado = false; // 🔧 reset do status admin
   document.getElementById("adminArea").style.display="none";
   document.getElementById("adminLogin").style.display="none";
 }
-  
+
 // Inicializa ao carregar
 mostrarAgenda();
 atualizarHorarios();
 </script>
-
-</body>
-</html>

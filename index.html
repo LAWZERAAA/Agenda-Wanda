@@ -5,6 +5,7 @@
   <title>Sistema de Agendamentos</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+  <!-- Evitar cache -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
@@ -17,7 +18,7 @@
 
   <!-- CLIENTE -->
   <div class="card">
-    <h2>Agendamentos</h2>
+    <h2>Agendamento</h2>
 
     <label>Nome</label>
     <input id="nome" type="text" placeholder="Seu nome completo" />
@@ -39,7 +40,7 @@
 
     <div id="sucesso" class="success">Agendado com sucesso!</div>
 
-    <h3>Agenda Pública</h3>
+    <h3 style="margin-top:20px">Agenda Pública</h3>
     <div id="agenda"></div>
   </div>
 
@@ -49,13 +50,13 @@
 
     <button onclick="mostrarLogin()">Entrar como administrador</button>
 
-    <div id="adminLogin" style="display:none">
+    <div id="adminLogin" style="display:none; margin-top:10px">
       <input id="adminUser" type="email" placeholder="E-mail" />
       <input id="adminPass" type="password" placeholder="Senha" />
       <button onclick="loginAdmin()">Entrar</button>
     </div>
 
-    <div id="adminArea" style="display:none">
+    <div id="adminArea" style="display:none; margin-top:10px">
       <h3>Agendamentos</h3>
       <span id="adminCount" class="muted"></span>
       <div id="adminList"></div>

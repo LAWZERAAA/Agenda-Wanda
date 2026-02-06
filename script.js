@@ -58,17 +58,29 @@ let cacheAgenda = [];
 let unsubscribeAgenda = null;
 
 // ------------------------
-// Utils
+// Utils (corrigido: parser local, sem UTC)
 // ------------------------
+function parseDateLocal(dateStr){
+  // dateStr 'YYYY-MM-DD' -> Date local 00:00
+  const [y,m,d] = (dateStr||"").split("-").map(Number);
+  if(!y || !m || !d) return null;
+  return new Date(y, m-1, d, 0, 0, 0, 0);
+}
 function hhmmParaMinutos(hhmm){ const [h,m] = (hhmm||"").split(":").map(Number); return (isNaN(h)||isNaN(m)) ? NaN : h*60+m; }
 function minutosParaHHMM(min){ if (typeof min !== "number" || isNaN(min)) return ""; const h = String(Math.floor(min/60)).padStart(2,"0"); const m = String(min%60).padStart(2,"0"); return `${h}:${m}`; }
 function intervalosSobrepoem(aInicio, aDur, bInicio, bDur){ if([aInicio,aDur,bInicio,bDur].some(v => typeof v!=="number"||isNaN(v))) return false; return (aInicio < bInicio+bDur) && (bInicio < aInicio+aDur); }
 function toDateInputValue(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,"0"); const day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; }
 function soDigitos(s){ return (s||"").replace(/\D/g,""); }
-function isSunday(dateStr){ if(!dateStr) return false; const [y,m,d]=dateStr.split("-").map(Number); return new Date(y,m-1,d).getDay()===0; }
-function isPastDate(dateStr){ if(!dateStr) return false; const hoje=new Date(); hoje.setHours(0,0,0,0); const d=new Date(dateStr+"T00:00:00"); return d<hoje; }
-function isPastTimeOnDate(dateStr,hhmm){ if(!dateStr||!hhmm) return false; const now=new Date(); const [h,m]=hhmm.split(":").map(Number); const t=new Date(dateStr+"T00:00:00"); t.setHours(h||0,m||0,0,0); return t<=now; }
-function isToday(dateStr){ return dateStr === toDateInputValue(new Date()); }
+function isSunday(dateStr){ const dt=parseDateLocal(dateStr); if(!dt) return false; return dt.getDay()===0; }
+function isPastDate(dateStr){ const hoje=new Date(); hoje.setHours(0,0,0,0); const d=parseDateLocal(dateStr); if(!d) return false; return d < hoje; }
+function isPastTimeOnDate(dateStr,hhmm){
+  const dt = parseDateLocal(dateStr);
+  if(!dt || !hhmm) return false;
+  const [h,m] = hhmm.split(":").map(Number);
+  dt.setHours(h||0, m||0, 0, 0); // local
+  return dt <= new Date();
+}
+function isToday(dateStr){ const dt=parseDateLocal(dateStr); if(!dt) return false; return toDateInputValue(dt) === toDateInputValue(new Date()); }
 function orderByDataHora(a,b){ const ka = `${a.data||"9999-99-99"} ${a.hora||"99:99"}`; const kb = `${b.data||"9999-99-99"} ${b.hora||"99:99"}`; return ka.localeCompare(kb); }
 const horariosBase = (()=>{ const a=[]; for(let m=START_DAY_MIN; m + SLOT_MIN <= END_DAY_MIN; m+=SLOT_MIN){ a.push(minutosParaHHMM(m)); } return a; })();
 
@@ -77,7 +89,7 @@ const horariosBase = (()=>{ const a=[]; for(let m=START_DAY_MIN; m + SLOT_MIN <=
 // ------------------------
 function popularServicos(){
   const sel = document.getElementById("servico");
-  // Placeholder
+  // Placeholder (mantém até o usuário escolher)
   sel.innerHTML = `<option value="" disabled selected>Selecione o serviço</option>`;
   servicos.forEach(s=>{
     const op=document.createElement("option");
@@ -85,9 +97,8 @@ function popularServicos(){
     sel.appendChild(op);
   });
 
-  // ALTERAÇÃO: sem auto-selecionar o 1º serviço (placeholder permanece)
+  // Ao trocar serviço, limpamos horários e pedimos data+serviço
   sel.onchange = ()=>{
-    // Limpa horários ao trocar serviço
     const horaSel = document.getElementById("hora");
     if (horaSel) horaSel.innerHTML = "";
     const msg = document.getElementById("msgHorarios");
@@ -104,7 +115,7 @@ function abrirWhatsApp(url){ try{ window.location.href=url; }catch(e){ window.op
 function subscribeAgenda(){
   if (unsubscribeAgenda) unsubscribeAgenda();
   const col = collection(db, "agendamentos");
-  const q = query(col, orderBy('data'), orderBy('hora')); // ordenado por data/hora
+  const q = query(col, orderBy('data'), orderBy('hora'));
   unsubscribeAgenda = onSnapshot(q, (snap)=>{
     cacheAgenda = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     mostrarAgenda();
@@ -125,10 +136,10 @@ async function atualizarHorarios(){
 
   if(!horaSel || !msg) return;
 
-  // Limpa antes de recomputar
+  // Limpa a combo antes
   horaSel.innerHTML = "";
 
-  // Precisamos de serviço + data
+  // Validar entrada
   if(!data || !servicoID || servicoID === ""){
     msg.textContent = "Selecione data e serviço.";
     return;
@@ -142,28 +153,29 @@ async function atualizarHorarios(){
     return;
   }
 
-  msg.textContent="Carregando horários…";
+  msg.textContent = "Carregando horários…";
   const servico = servicos.find(s=>s.id===servicoID);
   if(!servico){
     msg.textContent="Serviço inválido. Escolha novamente.";
     return;
   }
 
-  // Busca horários ocupados naquele dia
+  // Ocupados do dia
   let ocupados=[];
   try{
     const res = await getDocs(query(collection(db,"agendamentos"), where('data','==',data)));
     ocupados = res.docs.map(d=>({ inicio: hhmmParaMinutos(d.data().hora), dur: d.data().duracao||60 }));
   }catch(e){
     console.error("Erro ao obter ocupados:", e);
-    // Continua como vazio; não deve bloquear horários
+    // segue com ocupados=[]
   }
 
+  const sameDay = isToday(data);
   let disponiveis=0;
-  const sameDay = isToday(data); // ALTERAÇÃO: só filtrar horários passados se for hoje
 
   for(const hr of horariosBase){
-    if(sameDay && isPastTimeOnDate(data,hr)) continue; // ALTERAÇÃO: filtro apenas no mesmo dia
+    if(sameDay && isPastTimeOnDate(data, hr)) continue; // só filtra horas passadas se a data for hoje
+
     const inicio = hhmmParaMinutos(hr);
     const conflita = ocupados.some(o=>intervalosSobrepoem(inicio, servico.duracao, o.inicio, o.dur));
     if(!conflita){
@@ -178,7 +190,7 @@ async function atualizarHorarios(){
     msg.textContent = "Horários disponíveis:";
   }else{
     msg.textContent = "Nenhum horário disponível nesta data.";
-    // Opcional: mostrar 1 opção desabilitada
+    // Mostra placeholder desabilitado para deixar claro
     const op=document.createElement("option");
     op.value=""; op.textContent="— sem horários —"; op.disabled=true; op.selected=true;
     horaSel.appendChild(op);
@@ -195,12 +207,12 @@ async function agendar(){
   if(!nome || !contatoRaw || !data || !hora || !servicoID){ alert("Preencha todos os campos."); return; }
   if(isPastDate(data)){ alert("Data já passou."); return; }
   if(isSunday(data)){ alert("Domingo indisponível."); return; }
-  if(isToday(data) && isPastTimeOnDate(data,hora)){ alert("Horário já passou."); return; } // ALTERAÇÃO: checagem só pro mesmo dia
+  if(isToday(data) && isPastTimeOnDate(data,hora)){ alert("Horário já passou."); return; }
 
   const servico = servicos.find(s=>s.id===servicoID);
   if(!servico){ alert("Serviço inválido."); return; }
 
-  // Checar conflito no Firestore
+  // Checar conflito
   try{
     const res = await getDocs(query(collection(db,"agendamentos"), where('data','==',data)));
     const inicio = hhmmParaMinutos(hora);
@@ -211,7 +223,7 @@ async function agendar(){
     if(conflita){ alert("Conflito de horário. Escolha outro horário."); atualizarHorarios(); return; }
   }catch(e){
     console.error("Erro ao checar conflito:", e);
-    alert("Não foi possível verificar conflitos. Tente novamente.");
+    alert("Não foi possível verificar conflitos agora. Tente novamente.");
     return;
   }
 
@@ -229,10 +241,8 @@ async function agendar(){
     const success=document.getElementById("sucesso");
     if(success){ success.style.display="block"; setTimeout(()=>success.style.display="none",3000); }
 
-    // Recalcula horários (pode ter ocupado o slot)
     atualizarHorarios();
 
-    // WhatsApp ao admin
     const msg =
 `Olá! 💅
 Novo agendamento:
@@ -337,13 +347,12 @@ function statusBadge(item){
 }
 
 function formatarDataBr(yyyyMMdd){
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(yyyyMMdd||"")) return yyyyMMdd||"-";
-  const [y,m,d] = yyyyMMdd.split("-").map(Number);
-  const dt = new Date(y, m-1, d);
+  const dt = parseDateLocal(yyyyMMdd);
+  if(!dt) return yyyyMMdd||"-";
   const semana = dt.toLocaleDateString('pt-BR', { weekday:'long' });
-  const dia    = String(d).padStart(2,"0");
+  const dia    = String(dt.getDate()).padStart(2,"0");
   const mes    = dt.toLocaleDateString('pt-BR', { month:'long' });
-  const ano    = y;
+  const ano    = dt.getFullYear();
   return `${semana}, ${dia} de ${mes} de ${ano}`;
 }
 

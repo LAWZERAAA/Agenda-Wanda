@@ -5,82 +5,66 @@
   <title>Sistema de Agendamentos</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Evitar cache antigo -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
 
-  <!-- CSS (na raiz do repo) -->
-  <link rel="stylesheet" href="./style.css?v=20260206-7" />
+  <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
 
 <div class="container">
-  <!-- Cliente -->
+
+  <!-- CLIENTE -->
   <div class="card">
     <h2>Agendamentos</h2>
 
     <label>Nome</label>
-    <input id="nome" type="text" placeholder="Seu nome" />
+    <input id="nome" type="text" placeholder="Seu nome completo" />
 
-    <label>WhatsApp para Contato</label>
+    <label>WhatsApp</label>
     <input id="contato" type="text" placeholder="(DDD) 99999-9999" />
 
     <label>Serviço</label>
-    <!-- Mantém placeholder até o usuário escolher -->
     <select id="servico"></select>
 
     <label>Data</label>
     <input id="data" type="date" onchange="atualizarHorarios()" />
 
     <label>Horário</label>
-    <select id="hora" disabled></select>
-    <div id="msgHorarios" class="muted" style="margin-top:6px;"></div>
+    <select id="hora"></select>
+    <div id="msgHorarios" class="muted"></div>
 
     <button onclick="agendar()">Agendar</button>
 
     <div id="sucesso" class="success">Agendado com sucesso!</div>
 
-    <h3 style="margin-top:18px;">Todos os Agendamentos (Ordem Cronológica)</h3>
+    <h3>Agenda Pública</h3>
     <div id="agenda"></div>
   </div>
 
-  <!-- Admin -->
+  <!-- ADMIN -->
   <div class="card">
-    <h2>Painel do Administrador</h2>
-    <button class="btn-outline" onclick="mostrarLogin()">Entrar / Trocar Usuário</button>
+    <h2>Painel Administrativo</h2>
 
-    <!-- Login admin -->
-    <div id="adminLogin" style="margin-top:10px; display:none;">
-      <h3>Login</h3>
-      <!-- ATUALIZADO: aceita e-mail ou usuário -->
-      <input id="adminUser" type="text" placeholder="E-mail ou Usuário" />
+    <button onclick="mostrarLogin()">Entrar como administrador</button>
+
+    <div id="adminLogin" style="display:none">
+      <input id="adminUser" type="email" placeholder="E-mail" />
       <input id="adminPass" type="password" placeholder="Senha" />
       <button onclick="loginAdmin()">Entrar</button>
     </div>
 
-    <!-- Área admin -->
-    <div id="adminArea" style="display:none;">
-      <div class="card soft" style="margin-bottom:12px;">
-        <h3>Todos os Agendamentos (Ordem Cronológica)</h3>
-        <div class="legend">
-          <span class="tag tag-past">Passado</span>
-          <span class="tag tag-today">Hoje</span>
-          <span class="tag tag-future">Futuro</span>
-        </div>
-        <div class="admin-actions">
-          <span id="adminCount" class="muted"></span>
-        </div>
-      </div>
-
-      <div id="adminList" class="admin-list"></div>
-
-      <button class="btn-danger" onclick="logoutAdmin()">Sair</button>
+    <div id="adminArea" style="display:none">
+      <h3>Agendamentos</h3>
+      <span id="adminCount" class="muted"></span>
+      <div id="adminList"></div>
+      <button onclick="logoutAdmin()">Sair</button>
     </div>
   </div>
+
 </div>
 
-<!-- JS (ES Module obrigatório para imports do Firebase) -->
-<script type="module" src="./script.js?v=20260206-7"></script>
+<script type="module" src="./script.js"></script>
 </body>
 </html>

@@ -19,7 +19,8 @@ import {
   onSnapshot,
   doc,
   getDoc,
-  deleteDoc
+  deleteDoc,
+  limit // <-- ADICIONADO: para limitar busca em 'usuarios'
 } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
 
 // ------------------------
@@ -58,7 +59,7 @@ let cacheAgenda = [];
 let unsubscribeAgenda = null;
 
 // ------------------------
-// Utils (corrigido: parser local, sem UTC)
+// Utils (parser local, sem UTC)
 // ------------------------
 function parseDateLocal(dateStr){
   // dateStr 'YYYY-MM-DD' -> Date local 00:00
@@ -82,6 +83,7 @@ function isPastTimeOnDate(dateStr,hhmm){
 }
 function isToday(dateStr){ const dt=parseDateLocal(dateStr); if(!dt) return false; return toDateInputValue(dt) === toDateInputValue(new Date()); }
 function orderByDataHora(a,b){ const ka = `${a.data||"9999-99-99"} ${a.hora||"99:99"}`; const kb = `${b.data||"9999-99-99"} ${b.hora||"99:99"}`; return ka.localeCompare(kb); }
+
 const horariosBase = (()=>{ const a=[]; for(let m=START_DAY_MIN; m + SLOT_MIN <= END_DAY_MIN; m+=SLOT_MIN){ a.push(minutosParaHHMM(m)); } return a; })();
 
 // ------------------------
@@ -100,7 +102,10 @@ function popularServicos(){
   // Ao trocar serviço, limpamos horários e pedimos data+serviço
   sel.onchange = ()=>{
     const horaSel = document.getElementById("hora");
-    if (horaSel) horaSel.innerHTML = "";
+    if (horaSel) {
+      horaSel.innerHTML = "";
+      horaSel.disabled = true;
+    }
     const msg = document.getElementById("msgHorarios");
     if (msg) msg.textContent = "Selecione data e serviço.";
     atualizarHorarios();
@@ -136,8 +141,9 @@ async function atualizarHorarios(){
 
   if(!horaSel || !msg) return;
 
-  // Limpa a combo antes
+  // Limpa combo e desabilita por padrão
   horaSel.innerHTML = "";
+  horaSel.disabled = true;
 
   // Validar entrada
   if(!data || !servicoID || servicoID === ""){
@@ -174,7 +180,7 @@ async function atualizarHorarios(){
   let disponiveis=0;
 
   for(const hr of horariosBase){
-    if(sameDay && isPastTimeOnDate(data, hr)) continue; // só filtra horas passadas se a data for hoje
+    if(sameDay && isPastTimeOnDate(data, hr)) continue; // filtra horas passadas se a data for hoje
 
     const inicio = hhmmParaMinutos(hr);
     const conflita = ocupados.some(o=>intervalosSobrepoem(inicio, servico.duracao, o.inicio, o.dur));
@@ -188,12 +194,14 @@ async function atualizarHorarios(){
 
   if(disponiveis>0){
     msg.textContent = "Horários disponíveis:";
+    horaSel.disabled = false;
   }else{
     msg.textContent = "Nenhum horário disponível nesta data.";
     // Mostra placeholder desabilitado para deixar claro
     const op=document.createElement("option");
     op.value=""; op.textContent="— sem horários —"; op.disabled=true; op.selected=true;
     horaSel.appendChild(op);
+    horaSel.disabled = true;
   }
 }
 
@@ -296,6 +304,49 @@ function mostrarAgenda(){
 }
 
 // ------------------------
+// Admin — Auth helpers (email/username -> email)
+// ------------------------
+function isEmail(str) {
+  return typeof str === "string" && str.includes("@");
+}
+
+/**
+ * Resolve o e-mail a partir do identificador.
+ * - Se já for e-mail, normaliza e retorna.
+ * - Se for username, consulta a coleção 'usuarios' para pegar 'emailLower'.
+ * Estrutura esperada: usuarios/{uid} com { emailLower, usernameLower }
+ */
+async function resolveEmailFromIdentifier(identifier) {
+  const value = (identifier || "").trim().toLowerCase();
+  if (!value) throw new Error("Identificador vazio.");
+
+  if (isEmail(value)) {
+    return value;
+  }
+
+  // Busca por usernameLower == value
+  try {
+    const qUsers = query(
+      collection(db, "usuarios"),
+      where("usernameLower", "==", value),
+      limit(1)
+    );
+    const snap = await getDocs(qUsers);
+    if (snap.empty) {
+      throw new Error("Usuário não encontrado.");
+    }
+    const data = snap.docs[0].data();
+    if (!data.emailLower) {
+      throw new Error("Registro de usuário sem 'emailLower'.");
+    }
+    return String(data.emailLower).trim().toLowerCase();
+  } catch (e) {
+    console.error("Falha ao resolver username -> email:", e);
+    throw new Error("Não foi possível localizar o e-mail deste usuário.");
+  }
+}
+
+// ------------------------
 // Admin — Auth + UI
 // ------------------------
 function mostrarLogin(){
@@ -308,13 +359,22 @@ function mostrarLogin(){
 }
 
 async function loginAdmin(){
-  const email = (document.getElementById("adminUser")?.value||"").trim();
-  const pass  = (document.getElementById("adminPass")?.value||"").trim();
-  try{
+  const identifier = (document.getElementById("adminUser")?.value||"").trim();
+  const pass       = (document.getElementById("adminPass")?.value||"").trim();
+
+  if (!identifier || !pass) {
+    alert("Informe identificador (e-mail ou usuário) e senha.");
+    return;
+  }
+
+  try {
+    // Resolve username -> email, quando necessário
+    const email = await resolveEmailFromIdentifier(identifier);
     await signInWithEmailAndPassword(auth, email, pass);
-  }catch(e){
+    // Sucesso: onAuthStateChanged cuidará da UI
+  } catch(e) {
     console.error("Login falhou:", e);
-    alert("Credenciais incorretas ou erro de rede.");
+    alert("Credenciais incorretas ou usuário inexistente.");
   }
 }
 
@@ -442,6 +502,13 @@ window.addEventListener('DOMContentLoaded', ()=>{
   // Define 'min' da data = hoje (evita datas passadas no seletor)
   const dataEl = document.getElementById("data");
   if (dataEl) dataEl.min = toDateInputValue(new Date());
+
+  // Desabilita horários no carregamento
+  const horaSel = document.getElementById("hora");
+  if (horaSel) {
+    horaSel.innerHTML = "";
+    horaSel.disabled = true;
+  }
 
   popularServicos();
 

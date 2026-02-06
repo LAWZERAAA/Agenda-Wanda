@@ -68,6 +68,7 @@ function soDigitos(s){ return (s||"").replace(/\D/g,""); }
 function isSunday(dateStr){ if(!dateStr) return false; const [y,m,d]=dateStr.split("-").map(Number); return new Date(y,m-1,d).getDay()===0; }
 function isPastDate(dateStr){ if(!dateStr) return false; const hoje=new Date(); hoje.setHours(0,0,0,0); const d=new Date(dateStr+"T00:00:00"); return d<hoje; }
 function isPastTimeOnDate(dateStr,hhmm){ if(!dateStr||!hhmm) return false; const now=new Date(); const [h,m]=hhmm.split(":").map(Number); const t=new Date(dateStr+"T00:00:00"); t.setHours(h||0,m||0,0,0); return t<=now; }
+function isToday(dateStr){ return dateStr === toDateInputValue(new Date()); }
 function orderByDataHora(a,b){ const ka = `${a.data||"9999-99-99"} ${a.hora||"99:99"}`; const kb = `${b.data||"9999-99-99"} ${b.hora||"99:99"}`; return ka.localeCompare(kb); }
 const horariosBase = (()=>{ const a=[]; for(let m=START_DAY_MIN; m + SLOT_MIN <= END_DAY_MIN; m+=SLOT_MIN){ a.push(minutosParaHHMM(m)); } return a; })();
 
@@ -76,17 +77,23 @@ const horariosBase = (()=>{ const a=[]; for(let m=START_DAY_MIN; m + SLOT_MIN <=
 // ------------------------
 function popularServicos(){
   const sel = document.getElementById("servico");
+  // Placeholder
   sel.innerHTML = `<option value="" disabled selected>Selecione o serviço</option>`;
   servicos.forEach(s=>{
     const op=document.createElement("option");
     op.value=s.id; op.textContent=`${s.nome} — ${s.precoTexto} (${s.duracao/60}h)`;
     sel.appendChild(op);
   });
-  // Auto-seleciona o primeiro serviço real (evita esquecer de escolher)
-  if (sel.options.length > 1) {
-    sel.selectedIndex = 1;
-  }
-  sel.onchange = atualizarHorarios;
+
+  // ALTERAÇÃO: sem auto-selecionar o 1º serviço (placeholder permanece)
+  sel.onchange = ()=>{
+    // Limpa horários ao trocar serviço
+    const horaSel = document.getElementById("hora");
+    if (horaSel) horaSel.innerHTML = "";
+    const msg = document.getElementById("msgHorarios");
+    if (msg) msg.textContent = "Selecione data e serviço.";
+    atualizarHorarios();
+  };
 }
 
 function abrirWhatsApp(url){ try{ window.location.href=url; }catch(e){ window.open(url,"_blank"); } }
@@ -97,7 +104,7 @@ function abrirWhatsApp(url){ try{ window.location.href=url; }catch(e){ window.op
 function subscribeAgenda(){
   if (unsubscribeAgenda) unsubscribeAgenda();
   const col = collection(db, "agendamentos");
-  const q = query(col, orderBy('data'), orderBy('hora')); // ordena por data/hora
+  const q = query(col, orderBy('data'), orderBy('hora')); // ordenado por data/hora
   unsubscribeAgenda = onSnapshot(q, (snap)=>{
     cacheAgenda = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     mostrarAgenda();
@@ -111,28 +118,52 @@ function subscribeAgenda(){
 // Cliente — horários e agenda
 // ------------------------
 async function atualizarHorarios(){
-  const data = document.getElementById("data").value;
-  const servicoID = document.getElementById("servico").value;
+  const data = document.getElementById("data")?.value;
+  const servicoID = document.getElementById("servico")?.value;
   const horaSel = document.getElementById("hora");
   const msg = document.getElementById("msgHorarios");
 
+  if(!horaSel || !msg) return;
+
+  // Limpa antes de recomputar
   horaSel.innerHTML = "";
-  if(!data || !servicoID){ msg.textContent="Selecione data e serviço."; return; }
-  if(isPastDate(data)){ msg.textContent="Data já passou. Escolha outra."; return; }
-  if(isSunday(data)){ msg.textContent="Domingo indisponível. Escolha outro dia."; return; }
+
+  // Precisamos de serviço + data
+  if(!data || !servicoID || servicoID === ""){
+    msg.textContent = "Selecione data e serviço.";
+    return;
+  }
+  if(isPastDate(data)){
+    msg.textContent = "Data já passou. Escolha outra.";
+    return;
+  }
+  if(isSunday(data)){
+    msg.textContent = "Domingo indisponível. Escolha outro dia.";
+    return;
+  }
 
   msg.textContent="Carregando horários…";
   const servico = servicos.find(s=>s.id===servicoID);
+  if(!servico){
+    msg.textContent="Serviço inválido. Escolha novamente.";
+    return;
+  }
 
+  // Busca horários ocupados naquele dia
   let ocupados=[];
   try{
     const res = await getDocs(query(collection(db,"agendamentos"), where('data','==',data)));
     ocupados = res.docs.map(d=>({ inicio: hhmmParaMinutos(d.data().hora), dur: d.data().duracao||60 }));
-  }catch(e){ console.error("Erro ao obter ocupados:", e); }
+  }catch(e){
+    console.error("Erro ao obter ocupados:", e);
+    // Continua como vazio; não deve bloquear horários
+  }
 
   let disponiveis=0;
+  const sameDay = isToday(data); // ALTERAÇÃO: só filtrar horários passados se for hoje
+
   for(const hr of horariosBase){
-    if(!isPastDate(data) && isPastTimeOnDate(data,hr)) continue;
+    if(sameDay && isPastTimeOnDate(data,hr)) continue; // ALTERAÇÃO: filtro apenas no mesmo dia
     const inicio = hhmmParaMinutos(hr);
     const conflita = ocupados.some(o=>intervalosSobrepoem(inicio, servico.duracao, o.inicio, o.dur));
     if(!conflita){
@@ -142,7 +173,16 @@ async function atualizarHorarios(){
       disponiveis++;
     }
   }
-  msg.textContent = (disponiveis>0) ? "Horários disponíveis:" : "Nenhum horário disponível nesta data.";
+
+  if(disponiveis>0){
+    msg.textContent = "Horários disponíveis:";
+  }else{
+    msg.textContent = "Nenhum horário disponível nesta data.";
+    // Opcional: mostrar 1 opção desabilitada
+    const op=document.createElement("option");
+    op.value=""; op.textContent="— sem horários —"; op.disabled=true; op.selected=true;
+    horaSel.appendChild(op);
+  }
 }
 
 async function agendar(){
@@ -155,11 +195,12 @@ async function agendar(){
   if(!nome || !contatoRaw || !data || !hora || !servicoID){ alert("Preencha todos os campos."); return; }
   if(isPastDate(data)){ alert("Data já passou."); return; }
   if(isSunday(data)){ alert("Domingo indisponível."); return; }
-  if(isPastTimeOnDate(data,hora)){ alert("Horário já passou."); return; }
+  if(isToday(data) && isPastTimeOnDate(data,hora)){ alert("Horário já passou."); return; } // ALTERAÇÃO: checagem só pro mesmo dia
 
   const servico = servicos.find(s=>s.id===servicoID);
+  if(!servico){ alert("Serviço inválido."); return; }
 
-  // Checar conflito
+  // Checar conflito no Firestore
   try{
     const res = await getDocs(query(collection(db,"agendamentos"), where('data','==',data)));
     const inicio = hhmmParaMinutos(hora);
@@ -168,7 +209,11 @@ async function agendar(){
       return intervalosSobrepoem(inicio, servico.duracao, hhmmParaMinutos(a.hora), a.duracao||60);
     });
     if(conflita){ alert("Conflito de horário. Escolha outro horário."); atualizarHorarios(); return; }
-  }catch(e){ console.error("Erro ao checar conflito:", e); alert("Não foi possível verificar conflitos. Tente novamente."); return; }
+  }catch(e){
+    console.error("Erro ao checar conflito:", e);
+    alert("Não foi possível verificar conflitos. Tente novamente.");
+    return;
+  }
 
   const contato = soDigitos(contatoRaw);
   const registro = {
@@ -184,7 +229,7 @@ async function agendar(){
     const success=document.getElementById("sucesso");
     if(success){ success.style.display="block"; setTimeout(()=>success.style.display="none",3000); }
 
-    // Atualiza horários (pode ter mudado a disponibilidade)
+    // Recalcula horários (pode ter ocupado o slot)
     atualizarHorarios();
 
     // WhatsApp ao admin
@@ -385,7 +430,7 @@ function renderAdminList(){
 // Inicialização
 // ------------------------
 window.addEventListener('DOMContentLoaded', ()=>{
-  // Define 'min' da data para hoje (evita datas passadas no seletor)
+  // Define 'min' da data = hoje (evita datas passadas no seletor)
   const dataEl = document.getElementById("data");
   if (dataEl) dataEl.min = toDateInputValue(new Date());
 
@@ -393,11 +438,6 @@ window.addEventListener('DOMContentLoaded', ()=>{
 
   const msg = document.getElementById("msgHorarios");
   if (msg) msg.textContent = "Selecione data e serviço.";
-
-  // Se já houver valor na data (ou serviço auto-selecionado), tenta carregar horários
-  if (document.getElementById("data")?.value && document.getElementById("servico")?.value) {
-    atualizarHorarios();
-  }
 
   // Assina a coleção em tempo real
   subscribeAgenda();

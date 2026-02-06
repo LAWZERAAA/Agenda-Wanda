@@ -82,6 +82,10 @@ function popularServicos(){
     op.value=s.id; op.textContent=`${s.nome} — ${s.precoTexto} (${s.duracao/60}h)`;
     sel.appendChild(op);
   });
+  // Auto-seleciona o primeiro serviço real (evita esquecer de escolher)
+  if (sel.options.length > 1) {
+    sel.selectedIndex = 1;
+  }
   sel.onchange = atualizarHorarios;
 }
 
@@ -93,8 +97,7 @@ function abrirWhatsApp(url){ try{ window.location.href=url; }catch(e){ window.op
 function subscribeAgenda(){
   if (unsubscribeAgenda) unsubscribeAgenda();
   const col = collection(db, "agendamentos");
-  // Ordena por data e hora
-  const q = query(col, orderBy('data'), orderBy('hora'));
+  const q = query(col, orderBy('data'), orderBy('hora')); // ordena por data/hora
   unsubscribeAgenda = onSnapshot(q, (snap)=>{
     cacheAgenda = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     mostrarAgenda();
@@ -123,9 +126,7 @@ async function atualizarHorarios(){
 
   let ocupados=[];
   try{
-    const col = collection(db,"agendamentos");
-    const q = query(col, where('data','==',data));
-    const res = await getDocs(q);
+    const res = await getDocs(query(collection(db,"agendamentos"), where('data','==',data)));
     ocupados = res.docs.map(d=>({ inicio: hhmmParaMinutos(d.data().hora), dur: d.data().duracao||60 }));
   }catch(e){ console.error("Erro ao obter ocupados:", e); }
 
@@ -160,9 +161,7 @@ async function agendar(){
 
   // Checar conflito
   try{
-    const col = collection(db,"agendamentos");
-    const q = query(col, where('data','==',data));
-    const res = await getDocs(q);
+    const res = await getDocs(query(collection(db,"agendamentos"), where('data','==',data)));
     const inicio = hhmmParaMinutos(hora);
     const conflita = res.docs.some(doc=>{
       const a = doc.data();
@@ -185,7 +184,7 @@ async function agendar(){
     const success=document.getElementById("sucesso");
     if(success){ success.style.display="block"; setTimeout(()=>success.style.display="none",3000); }
 
-    // Atualiza horários
+    // Atualiza horários (pode ter mudado a disponibilidade)
     atualizarHorarios();
 
     // WhatsApp ao admin
@@ -386,20 +385,31 @@ function renderAdminList(){
 // Inicialização
 // ------------------------
 window.addEventListener('DOMContentLoaded', ()=>{
+  // Define 'min' da data para hoje (evita datas passadas no seletor)
+  const dataEl = document.getElementById("data");
+  if (dataEl) dataEl.min = toDateInputValue(new Date());
+
   popularServicos();
+
   const msg = document.getElementById("msgHorarios");
   if (msg) msg.textContent = "Selecione data e serviço.";
+
+  // Se já houver valor na data (ou serviço auto-selecionado), tenta carregar horários
+  if (document.getElementById("data")?.value && document.getElementById("servico")?.value) {
+    atualizarHorarios();
+  }
+
+  // Assina a coleção em tempo real
   subscribeAgenda();
 });
 
 // ------------------------
-// Expor funções ao HTML
-// (required porque script é module)
+// Expor funções ao HTML (script module)
 // ------------------------
-window.mostrarLogin = mostrarLogin;
-window.loginAdmin = loginAdmin;
-window.logoutAdmin = logoutAdmin;
-window.atualizarHorarios = atualizarHorarios;
-window.agendar = agendar;
-window.cancelarCliente = cancelarCliente;
-window.cancelarAdminById = cancelarAdminById;
+window.mostrarLogin       = mostrarLogin;
+window.loginAdmin         = loginAdmin;
+window.logoutAdmin        = logoutAdmin;
+window.atualizarHorarios  = atualizarHorarios;
+window.agendar            = agendar;
+window.cancelarCliente    = cancelarCliente;
+window.cancelarAdminById  = cancelarAdminById;

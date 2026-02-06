@@ -11,7 +11,7 @@
   <meta http-equiv="Expires" content="0" />
 
   <!-- CSS (na raiz do repo) -->
-  <link rel="stylesheet" href="./style.css?v=20260206-6" />
+  <link rel="stylesheet" href="./style.css?v=20260206-7" />
 </head>
 <body>
 
@@ -34,7 +34,7 @@
     <input id="data" type="date" onchange="atualizarHorarios()" />
 
     <label>Horário</label>
-    <select id="hora"></select>
+    <select id="hora" disabled></select>
     <div id="msgHorarios" class="muted" style="margin-top:6px;"></div>
 
     <button onclick="agendar()">Agendar</button>
@@ -53,7 +53,8 @@
     <!-- Login admin -->
     <div id="adminLogin" style="margin-top:10px; display:none;">
       <h3>Login</h3>
-      <input id="adminUser" type="email" placeholder="E-mail do Administrador" />
+      <!-- ATUALIZADO: aceita e-mail ou usuário -->
+      <input id="adminUser" type="text" placeholder="E-mail ou Usuário" />
       <input id="adminPass" type="password" placeholder="Senha" />
       <button onclick="loginAdmin()">Entrar</button>
     </div>
@@ -80,6 +81,6 @@
 </div>
 
 <!-- JS (ES Module obrigatório para imports do Firebase) -->
-<script type="module" src="./script.js?v=20260206-6"></script>
+<script type="module" src="./script.js?v=20260206-7"></script>
 </body>
 </html>

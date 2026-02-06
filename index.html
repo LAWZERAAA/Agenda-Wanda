@@ -11,7 +11,7 @@
   <meta http-equiv="Expires" content="0" />
 
   <!-- CSS (na raiz do repo) -->
-  <link rel="stylesheet" href="./style.css?v=20260206-5" />
+  <link rel="stylesheet" href="./style.css?v=20260206-6" />
 </head>
 <body>
 
@@ -27,11 +27,10 @@
     <input id="contato" type="text" placeholder="(DDD) 99999-9999" />
 
     <label>Serviço</label>
-    <!-- ALTERAÇÃO: manter placeholder; sem seleção automática -->
+    <!-- Mantém placeholder até o usuário escolher -->
     <select id="servico"></select>
 
     <label>Data</label>
-    <!-- onchange chama atualizarHorarios (exposta no window pelo script module) -->
     <input id="data" type="date" onchange="atualizarHorarios()" />
 
     <label>Horário</label>
@@ -80,7 +79,7 @@
   </div>
 </div>
 
-<!-- JS (ES Module obrigatório) -->
-<script type="module" src="./script.js?v=20260206-5"></script>
+<!-- JS (ES Module obrigatório para imports do Firebase) -->
+<script type="module" src="./script.js?v=20260206-6"></script>
 </body>
 </html>
